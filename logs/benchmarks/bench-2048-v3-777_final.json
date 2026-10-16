@@ -1,0 +1,40 @@
+{
+  "session_id": "bench-2048-v3-777",
+  "game": "2048",
+  "agent_name": "ZENITH",
+  "state": {
+    "grid": [
+      [
+        256,
+        64,
+        16,
+        2
+      ],
+      [
+        16,
+        32,
+        2,
+        16
+      ],
+      [
+        8,
+        64,
+        32,
+        8
+      ],
+      [
+        4,
+        8,
+        4,
+        2
+      ]
+    ],
+    "score": 2792,
+    "best": 256
+  },
+  "done": true,
+  "score": 2792,
+  "won": false,
+  "steps": 241,
+  "result": "applied"
+}

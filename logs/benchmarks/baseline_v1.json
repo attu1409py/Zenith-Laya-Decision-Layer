@@ -1,0 +1,285 @@
+[
+  {
+    "seed": 42,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "score": 0,
+    "food_eaten": 0,
+    "accepted_moves": 7,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "wall_collision",
+    "avg_inference_ms": 81.29,
+    "min_inference_ms": 41,
+    "max_inference_ms": 310,
+    "total_time_s": 0.59,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v1-42.jsonl",
+    "failure_details": {
+      "termination_reason": "wall_collision",
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this Snake game on a 12x12 board (columns x: 0-11, rows y: 0-11), the snake head is at [6, 0], body length is 3, current direction is up, and food is at [4, 2]. Which direction (up, down, left, right) should the snake move next to avoid collisions and advance toward the food?"
+        ],
+        "probabilities": {
+          "up": 0.8636,
+          "down": 0.0344,
+          "left": 0.0299,
+          "right": 0.0722
+        },
+        "chosen": "up",
+        "confidence": 0.8636,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        }
+      ],
+      "food_final": {
+        "x": 4,
+        "y": 2
+      }
+    }
+  },
+  {
+    "seed": 100,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "score": 0,
+    "food_eaten": 0,
+    "accepted_moves": 7,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "wall_collision",
+    "avg_inference_ms": 41.14,
+    "min_inference_ms": 40,
+    "max_inference_ms": 43,
+    "total_time_s": 0.32,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v1-100.jsonl",
+    "failure_details": {
+      "termination_reason": "wall_collision",
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this Snake game on a 12x12 board (columns x: 0-11, rows y: 0-11), the snake head is at [6, 0], body length is 3, current direction is up, and food is at [1, 3]. Which direction (up, down, left, right) should the snake move next to avoid collisions and advance toward the food?"
+        ],
+        "probabilities": {
+          "up": 0.8599,
+          "down": 0.034,
+          "left": 0.0305,
+          "right": 0.0756
+        },
+        "chosen": "up",
+        "confidence": 0.8599,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        }
+      ],
+      "food_final": {
+        "x": 1,
+        "y": 3
+      }
+    }
+  },
+  {
+    "seed": 2026,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "score": 60,
+    "food_eaten": 1,
+    "accepted_moves": 7,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "wall_collision",
+    "avg_inference_ms": 42.0,
+    "min_inference_ms": 40,
+    "max_inference_ms": 43,
+    "total_time_s": 0.31,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v1-2026.jsonl",
+    "failure_details": {
+      "termination_reason": "wall_collision",
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this Snake game on a 12x12 board (columns x: 0-11, rows y: 0-11), the snake head is at [6, 0], body length is 4, current direction is up, and food is at [1, 7]. Which direction (up, down, left, right) should the snake move next to avoid collisions and advance toward the food?"
+        ],
+        "probabilities": {
+          "up": 0.8871,
+          "down": 0.0295,
+          "left": 0.0209,
+          "right": 0.0624
+        },
+        "chosen": "up",
+        "confidence": 0.8871,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        },
+        {
+          "x": 6,
+          "y": 3
+        }
+      ],
+      "food_final": {
+        "x": 1,
+        "y": 7
+      }
+    }
+  },
+  {
+    "seed": 7,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "score": 0,
+    "food_eaten": 0,
+    "accepted_moves": 7,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "wall_collision",
+    "avg_inference_ms": 41.86,
+    "min_inference_ms": 41,
+    "max_inference_ms": 43,
+    "total_time_s": 0.32,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v1-7.jsonl",
+    "failure_details": {
+      "termination_reason": "wall_collision",
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this Snake game on a 12x12 board (columns x: 0-11, rows y: 0-11), the snake head is at [6, 0], body length is 3, current direction is up, and food is at [11, 6]. Which direction (up, down, left, right) should the snake move next to avoid collisions and advance toward the food?"
+        ],
+        "probabilities": {
+          "up": 0.8167,
+          "down": 0.0475,
+          "left": 0.0421,
+          "right": 0.0937
+        },
+        "chosen": "up",
+        "confidence": 0.8167,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        }
+      ],
+      "food_final": {
+        "x": 11,
+        "y": 6
+      }
+    }
+  },
+  {
+    "seed": 13,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "score": 60,
+    "food_eaten": 1,
+    "accepted_moves": 7,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "wall_collision",
+    "avg_inference_ms": 42.43,
+    "min_inference_ms": 41,
+    "max_inference_ms": 44,
+    "total_time_s": 0.32,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v1-13.jsonl",
+    "failure_details": {
+      "termination_reason": "wall_collision",
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this Snake game on a 12x12 board (columns x: 0-11, rows y: 0-11), the snake head is at [6, 0], body length is 4, current direction is up, and food is at [3, 6]. Which direction (up, down, left, right) should the snake move next to avoid collisions and advance toward the food?"
+        ],
+        "probabilities": {
+          "up": 0.8736,
+          "down": 0.0335,
+          "left": 0.024,
+          "right": 0.069
+        },
+        "chosen": "up",
+        "confidence": 0.8736,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        },
+        {
+          "x": 6,
+          "y": 3
+        }
+      ],
+      "food_final": {
+        "x": 3,
+        "y": 6
+      }
+    }
+  }
+]

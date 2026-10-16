@@ -1,0 +1,452 @@
+[
+  {
+    "seed": 42,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 128,
+    "score": 1316,
+    "tournament_score": 144,
+    "accepted_moves": 136,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 61.1,
+    "min_inference_ms": 53,
+    "max_inference_ms": 622,
+    "total_time_s": 8.53,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v2-42.jsonl",
+    "final_grid": [
+      [
+        2,
+        32,
+        2,
+        8
+      ],
+      [
+        4,
+        128,
+        16,
+        4
+      ],
+      [
+        16,
+        8,
+        64,
+        2
+      ],
+      [
+        2,
+        4,
+        2,
+        4
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 136,
+      "last_action": "right",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 128, score: 1316, empty cells: 1) is:\n+------+------+------+------+\n|    2 |   32 |    2 |    8 |\n+------+------+------+------+\n|    4 |  128 |   16 |    4 |\n+------+------+------+------+\n|   16 |    8 |   64 |    2 |\n+------+------+------+------+\n|    4 |    2 |    4 |      |\n+------+------+------+------+\nMoving up or left has no effect because no tiles can move or merge.\nMoving down or right slides tiles safely without merging.\nWhich direction should you slide the tiles next to merge numbers and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.1733,
+          "down": 0.3308,
+          "left": 0.1516,
+          "right": 0.3443
+        },
+        "chosen": "right",
+        "confidence": 0.3443,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          2,
+          32,
+          2,
+          8
+        ],
+        [
+          4,
+          128,
+          16,
+          4
+        ],
+        [
+          16,
+          8,
+          64,
+          2
+        ],
+        [
+          2,
+          4,
+          2,
+          4
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 100,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 128,
+    "score": 1392,
+    "tournament_score": 144,
+    "accepted_moves": 145,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 59.8,
+    "min_inference_ms": 54,
+    "max_inference_ms": 93,
+    "total_time_s": 8.89,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v2-100.jsonl",
+    "final_grid": [
+      [
+        4,
+        64,
+        2,
+        16
+      ],
+      [
+        16,
+        32,
+        16,
+        4
+      ],
+      [
+        4,
+        128,
+        8,
+        2
+      ],
+      [
+        2,
+        8,
+        16,
+        4
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 145,
+      "last_action": "right",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 128, score: 1384, empty cells: 0) is:\n+------+------+------+------+\n|    4 |   64 |    2 |   16 |\n+------+------+------+------+\n|   16 |   32 |   16 |    4 |\n+------+------+------+------+\n|    4 |  128 |    8 |    2 |\n+------+------+------+------+\n|    4 |    4 |   16 |    4 |\n+------+------+------+------+\nMoving up or down or left or right merges matching tiles to gain points and free space.\nWhich direction should you slide the tiles next to merge numbers and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.2868,
+          "down": 0.1768,
+          "left": 0.1636,
+          "right": 0.3727
+        },
+        "chosen": "right",
+        "confidence": 0.3727,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          64,
+          2,
+          16
+        ],
+        [
+          16,
+          32,
+          16,
+          4
+        ],
+        [
+          4,
+          128,
+          8,
+          2
+        ],
+        [
+          2,
+          8,
+          16,
+          4
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 2026,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 256,
+    "score": 3472,
+    "tournament_score": 289,
+    "accepted_moves": 292,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 59.39,
+    "min_inference_ms": 53,
+    "max_inference_ms": 134,
+    "total_time_s": 17.78,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v2-2026.jsonl",
+    "final_grid": [
+      [
+        64,
+        32,
+        2,
+        64
+      ],
+      [
+        4,
+        16,
+        8,
+        2
+      ],
+      [
+        32,
+        256,
+        128,
+        4
+      ],
+      [
+        8,
+        4,
+        8,
+        2
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 292,
+      "last_action": "down",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 256, score: 3472, empty cells: 1) is:\n+------+------+------+------+\n|   64 |   32 |    8 |   64 |\n+------+------+------+------+\n|    4 |   16 |  128 |    2 |\n+------+------+------+------+\n|   32 |  256 |    8 |    4 |\n+------+------+------+------+\n|    8 |    4 |      |    2 |\n+------+------+------+------+\nMoving up has no effect because no tiles can move or merge.\nMoving down or left or right slides tiles safely without merging.\nWhich direction should you slide the tiles next to merge numbers and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.0877,
+          "down": 0.3535,
+          "left": 0.2934,
+          "right": 0.2655
+        },
+        "chosen": "down",
+        "confidence": 0.3535,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          64,
+          32,
+          2,
+          64
+        ],
+        [
+          4,
+          16,
+          8,
+          2
+        ],
+        [
+          32,
+          256,
+          128,
+          4
+        ],
+        [
+          8,
+          4,
+          8,
+          2
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 7,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 128,
+    "score": 1716,
+    "tournament_score": 144,
+    "accepted_moves": 170,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 61.01,
+    "min_inference_ms": 54,
+    "max_inference_ms": 115,
+    "total_time_s": 10.65,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v2-7.jsonl",
+    "final_grid": [
+      [
+        4,
+        2,
+        16,
+        8
+      ],
+      [
+        64,
+        32,
+        64,
+        2
+      ],
+      [
+        8,
+        128,
+        16,
+        4
+      ],
+      [
+        2,
+        4,
+        32,
+        2
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 170,
+      "last_action": "right",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 128, score: 1716, empty cells: 1) is:\n+------+------+------+------+\n|    4 |    2 |   16 |    8 |\n+------+------+------+------+\n|   64 |   32 |   64 |    2 |\n+------+------+------+------+\n|    8 |  128 |   16 |    4 |\n+------+------+------+------+\n|    4 |   32 |    2 |      |\n+------+------+------+------+\nMoving up or left has no effect because no tiles can move or merge.\nMoving down or right slides tiles safely without merging.\nWhich direction should you slide the tiles next to merge numbers and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.1462,
+          "down": 0.348,
+          "left": 0.1355,
+          "right": 0.3703
+        },
+        "chosen": "right",
+        "confidence": 0.3703,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          2,
+          16,
+          8
+        ],
+        [
+          64,
+          32,
+          64,
+          2
+        ],
+        [
+          8,
+          128,
+          16,
+          4
+        ],
+        [
+          2,
+          4,
+          32,
+          2
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 13,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 64,
+    "score": 616,
+    "tournament_score": 616,
+    "accepted_moves": 85,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 58.53,
+    "min_inference_ms": 54,
+    "max_inference_ms": 100,
+    "total_time_s": 5.11,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v2-13.jsonl",
+    "final_grid": [
+      [
+        4,
+        16,
+        2,
+        4
+      ],
+      [
+        16,
+        64,
+        16,
+        2
+      ],
+      [
+        4,
+        2,
+        32,
+        8
+      ],
+      [
+        2,
+        8,
+        2,
+        4
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 85,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 64, score: 612, empty cells: 0) is:\n+------+------+------+------+\n|    4 |   16 |    2 |    4 |\n+------+------+------+------+\n|   16 |   64 |   16 |    2 |\n+------+------+------+------+\n|    2 |    2 |   32 |    8 |\n+------+------+------+------+\n|    2 |    8 |    2 |    4 |\n+------+------+------+------+\nMoving up or down or left or right merges matching tiles to gain points and free space.\nWhich direction should you slide the tiles next to merge numbers and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.3311,
+          "down": 0.2265,
+          "left": 0.1538,
+          "right": 0.2887
+        },
+        "chosen": "up",
+        "confidence": 0.3311,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          16,
+          2,
+          4
+        ],
+        [
+          16,
+          64,
+          16,
+          2
+        ],
+        [
+          4,
+          2,
+          32,
+          8
+        ],
+        [
+          2,
+          8,
+          2,
+          4
+        ]
+      ]
+    }
+  }
+]

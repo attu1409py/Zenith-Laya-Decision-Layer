@@ -26,9 +26,13 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, TextI
 from zenith.arena_client import ArenaClient, ArenaError
 from zenith.decision_validator import VALID_DIRECTIONS
 from zenith.decision_viewer import DecisionViewer
+from zenith.game2048_simulator import Deterministic2048Simulator
 from zenith.laya_adapter import APPROVED_MODEL_ID, LayaAdapter
 from zenith.runner import ArenaAdapter, DecideFn, SessionResult, SessionRunner
 from zenith.session_logger import SessionLogger
+
+Mock2048Arena = Deterministic2048Simulator
+
 
 TEAM_NAME: str = "ZENITH"
 DEFAULT_GAME: str = "snake"
@@ -184,33 +188,39 @@ def make_mock_decide_fn() -> DecideFn:
     """Create a synthetic decision function for fast testing without GPU weights."""
 
     def _mock_decide(game: str, state: Mapping[str, Any]) -> Dict[str, Any]:
-        # Formulate valid competition probabilities
-        q_text = (
-            f"Given {game} state with head at {state.get('snake', [{}])[0] if isinstance(state.get('snake'), list) and state.get('snake') else 'unknown'}, "
-            "which direction should the snake move?"
-        )
-        # Select action matching current direction or a safe turn
-        direction = str(state.get("direction", "up")).lower()
-        if direction not in VALID_DIRECTIONS:
-            direction = "up"
+        game_clean = str(game).strip().lower()
+        if game_clean == "2048":
+            q_text = "Which direction (up, down, left, right) should you slide the tiles next to merge numbers?"
+            grid = state.get("grid")
+            chosen = "left"
+            if isinstance(grid, list):
+                from zenith.game2048_simulator import simulate_move
+                for d in ("left", "down", "right", "up"):
+                    _, _, changed = simulate_move(grid, d)
+                    if changed:
+                        chosen = d
+                        break
+        else:
+            q_text = (
+                f"Given {game} state with head at {state.get('snake', [{}])[0] if isinstance(state.get('snake'), list) and state.get('snake') else 'unknown'}, "
+                "which direction should the snake move?"
+            )
+            direction = str(state.get("direction", "up")).lower()
+            chosen = direction if direction in VALID_DIRECTIONS else "up"
 
-        probs = {
-            "up": 0.05,
-            "down": 0.05,
-            "left": 0.05,
-            "right": 0.05,
-        }
-        probs[direction] = 0.85
-        # Ensure exact sum = 1.0
+        probs = {d: 0.05 for d in VALID_DIRECTIONS}
+        probs[chosen] = 0.85
         return {
             "questions": [q_text],
             "probabilities": probs,
-            "chosen": direction,
-            "confidence": probs[direction],
+            "chosen": chosen,
+            "confidence": probs[chosen],
             "source": "laya",
         }
 
     return _mock_decide
+
+
 
 
 # ── Live Confirmation Safeguard ───────────────────────────────────────
@@ -341,6 +351,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Stop after this many consecutive errors (default: 5).",
     )
     parser.add_argument(
+        "--prompt-version",
+        default="v1",
+        choices=["v1", "v2", "v3"],
+        help="Prompt strategy version ('v1' baseline, 'v2' revised, 'v3' strategic; default: 'v1').",
+    )
+    parser.add_argument(
         "--serve",
         action="store_true",
         help="Launch the ZENITH decision layer HTTP server and web UI console.",
@@ -404,10 +420,10 @@ def run_cli(
     is_live = bool(args.live)
     game = args.game.strip().lower()
 
-    if game != "snake":
+    if game not in ("snake", "2048"):
         stderr.write(
-            f"Error: Game '{game}' is currently locked. "
-            "Stage 1 requires a verified qualifying Snake run before 2048 is unlocked.\n"
+            f"Error: Game '{game}' is not supported. "
+            "Valid choices are: 'snake', '2048'.\n"
         )
         return 2
 
@@ -420,7 +436,10 @@ def run_cli(
         stdout.write(f"Initializing Laya decision adapter with checkpoint '{APPROVED_MODEL_ID}'...\n")
         stdout.flush()
         try:
-            adapter = LayaAdapter(model_id=APPROVED_MODEL_ID)
+            adapter_kwargs = {"model_id": APPROVED_MODEL_ID}
+            if hasattr(args, "prompt_version") and args.prompt_version != "v1":
+                adapter_kwargs["prompt_version"] = args.prompt_version
+            adapter = LayaAdapter(**adapter_kwargs)
             decide_fn = adapter.decide
         except Exception as exc:
             stderr.write(f"Failed to initialize Laya adapter: {exc}\n")
@@ -459,9 +478,13 @@ def run_cli(
     else:
         # Dry-run mode: explicitly simulated Arena adapter
         max_moves = args.max_moves if args.max_moves is not None else 10
-        mock_arena = MockSnakeArena(max_moves=max_moves)
+        if game == "snake":
+            mock_arena = MockSnakeArena(max_moves=max_moves)
+        else:
+            mock_arena = Deterministic2048Simulator(max_moves=max_moves, session_id_prefix="mock-2048")
         session_resp = mock_arena.create_session(game=game, agent_name=args.agent_name)
         arena = mock_arena
+
 
     session_id = str(session_resp.get("session_id", "")).strip()
     if not session_id:
@@ -471,6 +494,21 @@ def run_cli(
     # ── Step 3: Configure Logger, Viewer, and Runner ──
     log_dir = Path(args.log_dir)
     logger = SessionLogger(session_id=session_id, game=game, log_dir=log_dir)
+
+    # Preserve session creation response and attribution metadata locally
+    try:
+        logger.save_metadata({
+            "session_id": session_id,
+            "game": game,
+            "agent_name": args.agent_name,
+            "model_id": model_display,
+            "prompt_version": getattr(args, "prompt_version", "v1"),
+            "mode": "live" if is_live else "dry_run",
+            "initial_response": session_resp,
+        })
+    except Exception:
+        pass
+
     viewer = DecisionViewer(
         game=game,
         session_id=session_id,

@@ -28,6 +28,7 @@ from zenith.decision_validator import (
     DecisionValidationError,
     validate_decision,
 )
+from zenith.game2048_simulator import simulate_move
 
 APPROVED_MODEL_ID: str = "convaiinnovations/laya"
 QUESTION_KEY: str = "direction"
@@ -37,6 +38,13 @@ CRITERIA: Dict[str, str] = {
     "left": "Move left",
     "right": "Move right",
 }
+CRITERIA_2048: Dict[str, str] = {
+    "up": "Slide tiles up",
+    "down": "Slide tiles down",
+    "left": "Slide tiles left",
+    "right": "Slide tiles right",
+}
+
 
 
 class LayaInferenceError(RuntimeError):
@@ -64,11 +72,15 @@ def _parse_coord(pt: Any) -> Optional[Tuple[int, int]]:
     return None
 
 
-def format_snake_state(state: Mapping[str, Any]) -> Tuple[Dict[str, Any], str]:
+def format_snake_state(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Tuple[Dict[str, Any], str]:
     """Format an Arena Snake state mapping into a prompt state and question instruction.
 
     Args:
         state: Raw state dictionary returned by TopGameAI Arena API.
+        prompt_version: Prompt strategy version ('v1' baseline or 'v2' revised).
 
     Returns:
         A tuple of (prompt_state_dict, question_instruction_text).
@@ -148,24 +160,404 @@ def format_snake_state(state: Mapping[str, Any]) -> Tuple[Dict[str, Any], str]:
         "food_eaten": food_eaten,
     }
 
-    question_text = (
-        f"In this Snake game on a {width}x{height} board (columns x: 0-{width - 1}, rows y: 0-{height - 1}), "
-        f"the snake head is at {list(head)}, body length is {len(snake_cells) if snake_cells else 1}, "
-        f"current direction is {direction}, and food is at {list(food)}. "
-        "Which direction (up, down, left, right) should the snake move next to avoid collisions "
-        "and advance toward the food?"
-    )
+    if prompt_version == "v2":
+        hx, hy = head
+        fx, fy = food
+        offsets = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0),
+        }
+        body_coords = set(body)
+        neck = body[0] if body else None
+        dist_cur = abs(hx - fx) + abs(hy - fy)
+
+        lethal: List[str] = []
+        closer: List[str] = []
+        other_safe: List[str] = []
+
+        for d in VALID_DIRECTIONS:
+            dx, dy = offsets[d]
+            nx, ny = hx + dx, hy + dy
+            if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                lethal.append(d)
+            elif neck and (nx, ny) == neck:
+                lethal.append(d)
+            elif (nx, ny) in body_coords:
+                lethal.append(d)
+            else:
+                d_new = abs(nx - fx) + abs(ny - fy)
+                if d_new < dist_cur:
+                    closer.append(d)
+                else:
+                    other_safe.append(d)
+
+        parts = [f"The snake head is at ({hx}, {hy}) on a {width}x{height} grid. Food is at ({fx}, {fy})."]
+        if lethal:
+            lethal_str = " or ".join(lethal)
+            parts.append(f"Moving {lethal_str} causes fatal collision or illegal reversal.")
+        if closer:
+            closer_str = " or ".join(closer)
+            parts.append(f"Moving {closer_str} safely advances toward the food.")
+            parts.append("Which safe direction should the snake choose to advance toward the food?")
+        else:
+            safe_str = " or ".join(other_safe) if other_safe else "none"
+            parts.append(f"Moving {safe_str} stays safely on the board.")
+            parts.append("Which safe direction should the snake choose to avoid collision and stay alive?")
+        question_text = " ".join(parts)
+
+        prompt_state = {
+            "game": "snake",
+            "grid_size": f"{width}x{height}",
+            "head": list(head),
+            "food": list(food),
+            "food_eaten": food_eaten,
+            "safe_moves": closer + other_safe,
+        }
+    else:
+        question_text = (
+            f"In this Snake game on a {width}x{height} board (columns x: 0-{width - 1}, rows y: 0-{height - 1}), "
+            f"the snake head is at {list(head)}, body length is {len(snake_cells) if snake_cells else 1}, "
+            f"current direction is {direction}, and food is at {list(food)}. "
+            "Which direction (up, down, left, right) should the snake move next to avoid collisions "
+            "and advance toward the food?"
+        )
 
     return prompt_state, question_text
 
 
-def build_laya_questions(question_text: str) -> Dict[str, Dict[str, Any]]:
+def build_snake_criteria(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Dict[str, str]:
+    """Build the criteria dictionary for Laya choice options.
+
+    For 'v1', returns the static default criteria.
+    For 'v2', generates context-aware criteria detailing survival outcomes
+    and relative food proximity for each candidate direction.
+    """
+    if prompt_version != "v2":
+        return dict(CRITERIA)
+
+    if not isinstance(state, (dict, Mapping)):
+        state = {}
+
+    width = int(state.get("width", 12)) if state.get("width") is not None else 12
+    height = int(state.get("height", 12)) if state.get("height") is not None else 12
+
+    raw_snake = state.get("snake")
+    snake_cells: List[Tuple[int, int]] = []
+    if isinstance(raw_snake, list):
+        for s in raw_snake:
+            parsed = _parse_coord(s)
+            if parsed is not None:
+                snake_cells.append(parsed)
+
+    head = snake_cells[0] if snake_cells else (width // 2, height // 2)
+    body = snake_cells[1:] if len(snake_cells) > 1 else []
+    raw_food = state.get("food")
+    food = _parse_coord(raw_food) or (0, 0)
+
+    hx, hy = head
+    fx, fy = food
+    offsets = {
+        "up": (0, -1),
+        "down": (0, 1),
+        "left": (-1, 0),
+        "right": (1, 0),
+    }
+    body_coords = set(body)
+    neck = body[0] if body else None
+    dist_cur = abs(hx - fx) + abs(hy - fy)
+
+    criteria: Dict[str, str] = {}
+    for d in VALID_DIRECTIONS:
+        dx, dy = offsets[d]
+        nx, ny = hx + dx, hy + dy
+        if nx < 0 or nx >= width or ny < 0 or ny >= height:
+            criteria[d] = "Do not choose: deadly collision into wall"
+        elif neck and (nx, ny) == neck:
+            criteria[d] = "Do not choose: forbidden reversal into snake body"
+        elif (nx, ny) in body_coords:
+            criteria[d] = "Do not choose: deadly collision into snake body"
+        else:
+            d_new = abs(nx - fx) + abs(ny - fy)
+            if d_new < dist_cur:
+                criteria[d] = "Best move: advances toward the food, safe from collision"
+            else:
+                criteria[d] = "Safe move: safely avoids collision and stays on the board"
+
+    return criteria
+
+
+def _describe_2048_tile_position(
+    grid: Sequence[Sequence[int]],
+    target_val: int,
+) -> Tuple[Optional[Tuple[int, int]], str, str]:
+    """Locate the target tile on a 4x4 grid and describe its location.
+
+    Returns:
+        ((row, col), location_type, location_name)
+        location_type is one of: 'corner', 'outer wall', 'inner center'
+        location_name e.g.: 'bottom-left', 'top wall', 'inner center'
+    """
+    for r in range(4):
+        for c in range(4):
+            if grid[r][c] == target_val:
+                is_corner = (r, c) in ((0, 0), (0, 3), (3, 0), (3, 3))
+                is_edge = (r in (0, 3) or c in (0, 3)) and not is_corner
+                loc_type = "corner" if is_corner else ("outer wall" if is_edge else "inner center")
+                r_name = "top" if r == 0 else ("bottom" if r == 3 else f"row {r}")
+                c_name = "left" if c == 0 else ("right" if c == 3 else f"col {c}")
+                name = f"{r_name}-{c_name}" if (is_corner or is_edge) else "inner center"
+                return (r, c), loc_type, name
+    return None, "unknown", "unknown"
+
+
+def format_2048_grid_ascii(grid: Sequence[Sequence[int]]) -> str:
+    """Format a 4x4 2048 board into a clean, legible ASCII grid."""
+    lines = ["+------+------+------+------+"]
+    for row in grid:
+        cells = []
+        for val in row:
+            v_int = int(val) if val is not None else 0
+            cells.append(f"{v_int:>5} " if v_int > 0 else "      ")
+        lines.append("|" + "|".join(cells) + "|")
+        lines.append("+------+------+------+------+")
+    return "\n".join(lines)
+
+
+def format_2048_state(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Tuple[Dict[str, Any], str]:
+    """Format an Arena 2048 state mapping into a prompt state and question instruction.
+
+    Args:
+        state: Raw state dictionary returned by TopGameAI Arena API or simulator.
+        prompt_version: Prompt strategy version ('v1', 'v2', or 'v3').
+
+    Returns:
+        A tuple of (prompt_state_dict, question_instruction_text).
+    """
+    if not isinstance(state, (dict, Mapping)):
+        state = {}
+
+    raw_grid = state.get("grid")
+    grid: List[List[int]] = []
+    if isinstance(raw_grid, list) and len(raw_grid) == 4:
+        for row in raw_grid:
+            if isinstance(row, list) and len(row) == 4:
+                grid.append([int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0 for v in row])
+            else:
+                grid.append([0, 0, 0, 0])
+    else:
+        grid = [[0] * 4 for _ in range(4)]
+
+    # Extract score and best
+    raw_score = state.get("score")
+    score = int(raw_score) if isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) else 0
+
+    raw_best = state.get("best")
+    if isinstance(raw_best, (int, float)) and not isinstance(raw_best, bool) and int(raw_best) > 0:
+        best = int(raw_best)
+    else:
+        best = max((max(row) for row in grid), default=0)
+
+    empty_count = sum(1 for row in grid for cell in row if cell == 0)
+    grid_ascii = format_2048_grid_ascii(grid)
+
+    if prompt_version == "v3":
+        cur_pos, cur_type, cur_loc = _describe_2048_tile_position(grid, best)
+        merging_dirs: List[str] = []
+        slide_dirs: List[str] = []
+        noop_dirs: List[str] = []
+
+        for d in VALID_DIRECTIONS:
+            new_g, pts, changed = simulate_move(grid, d)
+            if not changed:
+                noop_dirs.append(d)
+            elif pts > 0:
+                merging_dirs.append(d)
+            else:
+                slide_dirs.append(d)
+
+        parts = [
+            f"The current 2048 board (highest tile: {best} in {cur_loc} [{cur_type}], score: {score}, empty cells: {empty_count}) is:\n{grid_ascii}",
+            f"Strategic priority: Keep your highest tile ({best}) anchored in a corner or outer wall, and merge matching numbers to free space.",
+        ]
+        if noop_dirs:
+            noop_str = " or ".join(noop_dirs)
+            parts.append(f"Moving {noop_str} is forbidden because no tiles can move or merge.")
+        if merging_dirs:
+            merge_str = " or ".join(merging_dirs)
+            parts.append(f"Moving {merge_str} merges matching tiles to gain points and free space.")
+        if slide_dirs:
+            slide_str = " or ".join(slide_dirs)
+            parts.append(f"Moving {slide_str} slides tiles safely without merging.")
+        parts.append("Which valid direction (up, down, left, right) should you choose to preserve your anchor, merge numbers, and build toward tile 512?")
+        question_text = "\n".join(parts)
+
+        prompt_state = {
+            "game": "2048",
+            "grid": grid,
+            "highest_tile": best,
+            "score": score,
+            "empty_cells": empty_count,
+            "valid_moves": merging_dirs + slide_dirs,
+        }
+    elif prompt_version == "v2":
+        merging_dirs = []
+        slide_dirs = []
+        noop_dirs = []
+
+        for d in VALID_DIRECTIONS:
+            new_g, pts, changed = simulate_move(grid, d)
+            if not changed:
+                noop_dirs.append(d)
+            elif pts > 0:
+                merging_dirs.append(d)
+            else:
+                slide_dirs.append(d)
+
+        parts = [
+            f"The current 2048 board (highest tile: {best}, score: {score}, empty cells: {empty_count}) is:\n{grid_ascii}"
+        ]
+        if noop_dirs:
+            noop_str = " or ".join(noop_dirs)
+            parts.append(f"Moving {noop_str} has no effect because no tiles can move or merge.")
+        if merging_dirs:
+            merge_str = " or ".join(merging_dirs)
+            parts.append(f"Moving {merge_str} merges matching tiles to gain points and free space.")
+        if slide_dirs:
+            slide_str = " or ".join(slide_dirs)
+            parts.append(f"Moving {slide_str} slides tiles safely without merging.")
+        parts.append("Which direction should you slide the tiles next to merge numbers and build toward tile 512?")
+        question_text = "\n".join(parts)
+
+        prompt_state = {
+            "game": "2048",
+            "grid": grid,
+            "highest_tile": best,
+            "score": score,
+            "empty_cells": empty_count,
+            "valid_moves": merging_dirs + slide_dirs,
+        }
+    else:
+        question_text = (
+            f"In this 2048 game on a 4x4 grid (highest tile: {best}, score: {score}), "
+            f"the current board is:\n{grid_ascii}\n"
+            "Which direction (up, down, left, right) should you slide the tiles next "
+            "to merge matching numbers and reach higher tiles?"
+        )
+        prompt_state = {
+            "game": "2048",
+            "grid": grid,
+            "highest_tile": best,
+            "score": score,
+            "empty_cells": empty_count,
+        }
+
+    return prompt_state, question_text
+
+
+def build_2048_criteria(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Dict[str, str]:
+    """Build the criteria dictionary for 2048 choice options.
+
+    For 'v1', returns static directional slide criteria.
+    For 'v2', generates context-aware criteria indicating merge points and
+    no-op warnings for each direction.
+    For 'v3', adds corner anchor tracking, space management, and verifiable
+    strategic outcomes for each direction.
+    """
+    if prompt_version not in ("v2", "v3"):
+        return dict(CRITERIA_2048)
+
+    if not isinstance(state, (dict, Mapping)):
+        state = {}
+
+    raw_grid = state.get("grid")
+    grid: List[List[int]] = []
+    if isinstance(raw_grid, list) and len(raw_grid) == 4:
+        for row in raw_grid:
+            if isinstance(row, list) and len(row) == 4:
+                grid.append([int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0 for v in row])
+            else:
+                grid.append([0, 0, 0, 0])
+    else:
+        grid = [[0] * 4 for _ in range(4)]
+
+    raw_best = state.get("best")
+    if isinstance(raw_best, (int, float)) and not isinstance(raw_best, bool) and int(raw_best) > 0:
+        best = int(raw_best)
+    else:
+        best = max((max(row) for row in grid), default=0)
+
+    if prompt_version == "v2":
+        criteria: Dict[str, str] = {}
+        for d in VALID_DIRECTIONS:
+            new_g, pts, changed = simulate_move(grid, d)
+            if not changed:
+                criteria[d] = "Do not choose: no tiles can move or merge in this direction (invalid no-op move)"
+            elif pts > 0:
+                criteria[d] = f"Merges matching tiles for +{pts} points and frees space"
+            else:
+                criteria[d] = "Safe slide: shifts tiles without merging"
+        return criteria
+
+    # prompt_version == 'v3'
+    cur_pos, cur_type, cur_loc = _describe_2048_tile_position(grid, best)
+    criteria_v3: Dict[str, str] = {}
+    for d in VALID_DIRECTIONS:
+        new_g, pts, changed = simulate_move(grid, d)
+        if not changed:
+            criteria_v3[d] = "Do not choose: forbidden no-op move with zero movement"
+            continue
+
+        new_empty = sum(1 for row in new_g for cell in row if cell == 0)
+        new_best = max((max(row) for row in new_g), default=best)
+        new_pos, new_type, new_loc = _describe_2048_tile_position(new_g, new_best)
+
+        anchor_clause = ""
+        if new_best > best:
+            anchor_clause = f" (creates NEW highest tile {new_best} in {new_loc})"
+        elif cur_type == "corner":
+            if new_type == "corner":
+                anchor_clause = f" (preserves highest tile in {new_loc} corner)"
+            else:
+                anchor_clause = f" (caution: pulls highest tile away from corner)"
+        elif cur_type == "outer wall":
+            if new_type in ("corner", "outer wall"):
+                anchor_clause = f" (keeps highest tile on {new_loc})"
+            else:
+                anchor_clause = f" (caution: pushes highest tile into inner center)"
+        else:  # cur was inner center
+            if new_type in ("corner", "outer wall"):
+                anchor_clause = f" (moves highest tile outward to {new_loc})"
+
+        if pts > 0:
+            criteria_v3[d] = f"Best move: merges matching tiles for +{pts} points and frees space{anchor_clause}"
+        else:
+            criteria_v3[d] = f"Safe move: shifts tiles safely without merging{anchor_clause}"
+
+    return criteria_v3
+
+
+
+def build_laya_questions(
+    question_text: str,
+    criteria: Optional[Dict[str, str]] = None,
+) -> Dict[str, Dict[str, Any]]:
     """Build the typed choice question dictionary required by Laya SDK."""
     return {
         QUESTION_KEY: {
             "type": "choice",
             "instructions": question_text,
-            "criteria": dict(CRITERIA),
+            "criteria": dict(criteria) if criteria is not None else dict(CRITERIA),
         }
     }
 
@@ -309,6 +701,7 @@ class LayaAdapter:
         agent: Optional[Any] = None,
         model_id: str = APPROVED_MODEL_ID,
         device: Optional[str] = None,
+        prompt_version: str = "v1",
     ) -> None:
         """Initialize LayaAdapter.
 
@@ -317,9 +710,11 @@ class LayaAdapter:
                 convaiinnovations/laya will be loaded via laya.load().
             model_id: Checkpoint identifier (must be convaiinnovations/laya).
             device: Optional runtime device override ('cuda', 'cpu', etc.).
+            prompt_version: Prompt strategy version ('v1' or 'v2').
         """
         self.model_id = model_id
         self.device = device
+        self.prompt_version = prompt_version
         self.last_metadata: Optional[Dict[str, Any]] = None
 
         if agent is not None:
@@ -361,14 +756,21 @@ class LayaAdapter:
             ValueError: If game is not 'snake'.
             LayaInferenceError: If model inference or parsing fails.
         """
-        if not isinstance(game, str) or game.lower() != "snake":
+        game_clean = str(game).strip().lower() if isinstance(game, str) else ""
+        if game_clean not in ("snake", "2048"):
             raise ValueError(
-                f"LayaAdapter currently only supports 'snake', got '{game}'."
+                f"LayaAdapter only supports 'snake' and '2048', got '{game}'."
             )
 
         # 1. Format state and question instructions
-        prompt_state, question_text = format_snake_state(state)
-        questions = build_laya_questions(question_text)
+        if game_clean == "snake":
+            prompt_state, question_text = format_snake_state(state, prompt_version=self.prompt_version)
+            criteria = build_snake_criteria(state, prompt_version=self.prompt_version)
+        else:
+            prompt_state, question_text = format_2048_state(state, prompt_version=self.prompt_version)
+            criteria = build_2048_criteria(state, prompt_version=self.prompt_version)
+
+        questions = build_laya_questions(question_text, criteria=criteria)
 
         # 2. Execute genuine inference
         t0 = time.perf_counter()

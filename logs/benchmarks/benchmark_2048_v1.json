@@ -1,0 +1,452 @@
+[
+  {
+    "seed": 42,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 8,
+    "score": 20,
+    "tournament_score": 20,
+    "accepted_moves": 6,
+    "rejected_moves": 10,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "unknown",
+    "avg_inference_ms": 107.4,
+    "min_inference_ms": 52,
+    "max_inference_ms": 686,
+    "total_time_s": 1.71,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v1-42.jsonl",
+    "final_grid": [
+      [
+        0,
+        0,
+        2,
+        8
+      ],
+      [
+        0,
+        0,
+        0,
+        4
+      ],
+      [
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": null,
+      "last_step": 6,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this 2048 game on a 4x4 grid (highest tile: 8, score: 20), the current board is:\n+------+------+------+------+\n|      |      |    2 |    8 |\n+------+------+------+------+\n|      |      |      |    4 |\n+------+------+------+------+\n|      |      |      |    2 |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\nWhich direction (up, down, left, right) should you slide the tiles next to merge matching numbers and reach higher tiles?"
+        ],
+        "probabilities": {
+          "up": 0.3496,
+          "down": 0.1907,
+          "left": 0.2189,
+          "right": 0.2408
+        },
+        "chosen": "up",
+        "confidence": 0.3496,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          0,
+          0,
+          2,
+          8
+        ],
+        [
+          0,
+          0,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 100,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 8,
+    "score": 16,
+    "tournament_score": 16,
+    "accepted_moves": 4,
+    "rejected_moves": 10,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "unknown",
+    "avg_inference_ms": 77.77,
+    "min_inference_ms": 54,
+    "max_inference_ms": 150,
+    "total_time_s": 1.11,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v1-100.jsonl",
+    "final_grid": [
+      [
+        0,
+        2,
+        2,
+        8
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": null,
+      "last_step": 4,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this 2048 game on a 4x4 grid (highest tile: 8, score: 16), the current board is:\n+------+------+------+------+\n|      |    2 |    2 |    8 |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\nWhich direction (up, down, left, right) should you slide the tiles next to merge matching numbers and reach higher tiles?"
+        ],
+        "probabilities": {
+          "up": 0.4108,
+          "down": 0.1775,
+          "left": 0.1997,
+          "right": 0.212
+        },
+        "chosen": "up",
+        "confidence": 0.4108,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          0,
+          2,
+          2,
+          8
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 2026,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 4,
+    "score": 12,
+    "tournament_score": 12,
+    "accepted_moves": 7,
+    "rejected_moves": 10,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "unknown",
+    "avg_inference_ms": 65.88,
+    "min_inference_ms": 49,
+    "max_inference_ms": 111,
+    "total_time_s": 1.14,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v1-2026.jsonl",
+    "final_grid": [
+      [
+        4,
+        2,
+        4,
+        4
+      ],
+      [
+        2,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": null,
+      "last_step": 7,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this 2048 game on a 4x4 grid (highest tile: 4, score: 12), the current board is:\n+------+------+------+------+\n|    4 |    2 |    4 |    4 |\n+------+------+------+------+\n|    2 |      |      |    2 |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\nWhich direction (up, down, left, right) should you slide the tiles next to merge matching numbers and reach higher tiles?"
+        ],
+        "probabilities": {
+          "up": 0.3052,
+          "down": 0.197,
+          "left": 0.2309,
+          "right": 0.2669
+        },
+        "chosen": "up",
+        "confidence": 0.3052,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          2,
+          4,
+          4
+        ],
+        [
+          2,
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 7,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 8,
+    "score": 12,
+    "tournament_score": 12,
+    "accepted_moves": 3,
+    "rejected_moves": 10,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "unknown",
+    "avg_inference_ms": 53.58,
+    "min_inference_ms": 51,
+    "max_inference_ms": 59,
+    "total_time_s": 0.72,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v1-7.jsonl",
+    "final_grid": [
+      [
+        4,
+        2,
+        0,
+        8
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": null,
+      "last_step": 3,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this 2048 game on a 4x4 grid (highest tile: 8, score: 12), the current board is:\n+------+------+------+------+\n|    4 |    2 |      |    8 |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\nWhich direction (up, down, left, right) should you slide the tiles next to merge matching numbers and reach higher tiles?"
+        ],
+        "probabilities": {
+          "up": 0.3208,
+          "down": 0.2065,
+          "left": 0.2323,
+          "right": 0.2404
+        },
+        "chosen": "up",
+        "confidence": 0.3208,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          2,
+          0,
+          8
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 13,
+    "prompt_version": "v1",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 8,
+    "score": 16,
+    "tournament_score": 16,
+    "accepted_moves": 6,
+    "rejected_moves": 10,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "unknown",
+    "avg_inference_ms": 65.2,
+    "min_inference_ms": 50,
+    "max_inference_ms": 124,
+    "total_time_s": 1.08,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v1-13.jsonl",
+    "final_grid": [
+      [
+        2,
+        2,
+        2,
+        8
+      ],
+      [
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": null,
+      "last_step": 6,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "In this 2048 game on a 4x4 grid (highest tile: 8, score: 16), the current board is:\n+------+------+------+------+\n|    2 |    2 |    2 |    8 |\n+------+------+------+------+\n|      |      |      |    2 |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\n|      |      |      |      |\n+------+------+------+------+\nWhich direction (up, down, left, right) should you slide the tiles next to merge matching numbers and reach higher tiles?"
+        ],
+        "probabilities": {
+          "up": 0.3563,
+          "down": 0.1962,
+          "left": 0.1997,
+          "right": 0.2477
+        },
+        "chosen": "up",
+        "confidence": 0.3563,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          2,
+          2,
+          2,
+          8
+        ],
+        [
+          0,
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  }
+]

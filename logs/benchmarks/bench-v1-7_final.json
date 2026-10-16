@@ -1,0 +1,33 @@
+{
+  "session_id": "bench-v1-7",
+  "game": "snake",
+  "agent_name": "ZENITH",
+  "state": {
+    "width": 12,
+    "height": 12,
+    "snake": [
+      {
+        "x": 6,
+        "y": 0
+      },
+      {
+        "x": 6,
+        "y": 1
+      },
+      {
+        "x": 6,
+        "y": 2
+      }
+    ],
+    "food": {
+      "x": 11,
+      "y": 6
+    },
+    "direction": "up",
+    "foodEaten": 0
+  },
+  "done": true,
+  "score": 0,
+  "won": false,
+  "result": "applied"
+}

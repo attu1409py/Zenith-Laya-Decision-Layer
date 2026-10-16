@@ -1,0 +1,232 @@
+[
+  {
+    "seed": 42,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 256,
+    "score": 3320,
+    "tournament_score": 289,
+    "accepted_moves": 409,
+    "rejected_moves": 9,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 54.67,
+    "min_inference_ms": 48,
+    "max_inference_ms": 632,
+    "total_time_s": 22.85,
+    "hash_chain_valid": true,
+    "log_path": "logs/benchmarks/bench-2048-v3-42.jsonl",
+    "final_grid": [
+      [
+        16,
+        64,
+        256,
+        32
+      ],
+      [
+        8,
+        128,
+        32,
+        8
+      ],
+      [
+        4,
+        32,
+        8,
+        4
+      ],
+      [
+        2,
+        16,
+        4,
+        2
+      ]
+    ],
+    "failure_details": null
+  },
+  {
+    "seed": 100,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 64,
+    "score": 600,
+    "tournament_score": 0,
+    "accepted_moves": 162,
+    "rejected_moves": 9,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 55.82,
+    "min_inference_ms": 48,
+    "max_inference_ms": 501,
+    "total_time_s": 9.55,
+    "hash_chain_valid": true,
+    "log_path": "logs/benchmarks/bench-2048-v3-100.jsonl",
+    "final_grid": [
+      [
+        2,
+        8,
+        16,
+        4
+      ],
+      [
+        16,
+        64,
+        32,
+        2
+      ],
+      [
+        4,
+        8,
+        16,
+        4
+      ],
+      [
+        2,
+        4,
+        8,
+        2
+      ]
+    ],
+    "failure_details": null
+  },
+  {
+    "seed": 2026,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 256,
+    "score": 2844,
+    "tournament_score": 288,
+    "accepted_moves": 254,
+    "rejected_moves": 9,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 51.17,
+    "min_inference_ms": 48,
+    "max_inference_ms": 97,
+    "total_time_s": 13.46,
+    "hash_chain_valid": true,
+    "log_path": "logs/benchmarks/bench-2048-v3-2026.jsonl",
+    "final_grid": [
+      [
+        256,
+        2,
+        4,
+        2
+      ],
+      [
+        2,
+        128,
+        32,
+        16
+      ],
+      [
+        4,
+        32,
+        4,
+        2
+      ],
+      [
+        2,
+        4,
+        8,
+        4
+      ]
+    ],
+    "failure_details": null
+  },
+  {
+    "seed": 7,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 512,
+    "score": 4588,
+    "tournament_score": 433,
+    "accepted_moves": 391,
+    "rejected_moves": 9,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 51.57,
+    "min_inference_ms": 48,
+    "max_inference_ms": 86,
+    "total_time_s": 20.63,
+    "hash_chain_valid": true,
+    "log_path": "logs/benchmarks/bench-2048-v3-7.jsonl",
+    "final_grid": [
+      [
+        8,
+        16,
+        4,
+        2
+      ],
+      [
+        16,
+        8,
+        512,
+        8
+      ],
+      [
+        2,
+        4,
+        64,
+        4
+      ],
+      [
+        32,
+        2,
+        8,
+        2
+      ]
+    ],
+    "failure_details": null
+  },
+  {
+    "seed": 13,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 256,
+    "score": 1960,
+    "tournament_score": 287,
+    "accepted_moves": 247,
+    "rejected_moves": 18,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 50.74,
+    "min_inference_ms": 48,
+    "max_inference_ms": 69,
+    "total_time_s": 13.45,
+    "hash_chain_valid": true,
+    "log_path": "logs/benchmarks/bench-2048-v3-13.jsonl",
+    "final_grid": [
+      [
+        256,
+        32,
+        8,
+        4
+      ],
+      [
+        0,
+        8,
+        16,
+        2
+      ],
+      [
+        0,
+        0,
+        2,
+        8
+      ],
+      [
+        0,
+        0,
+        0,
+        2
+      ]
+    ],
+    "failure_details": null
+  }
+]
