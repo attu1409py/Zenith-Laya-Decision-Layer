@@ -2,6 +2,8 @@
 """Convenience script to launch Team ZENITH decision runner.
 
 Usage:
+  python run_session.py --serve
+  python run_session.py --serve --mock-model
   python run_session.py --dry-run --mock-model
   python run_session.py --dry-run
   python run_session.py --live

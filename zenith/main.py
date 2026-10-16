@@ -340,6 +340,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=5,
         help="Stop after this many consecutive errors (default: 5).",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Launch the ZENITH decision layer HTTP server and web UI console.",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the web server (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind the web server (default: 8080).",
+    )
     return parser
 
 
@@ -363,6 +379,27 @@ def run_cli(
     """
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+
+    if getattr(args, "serve", False):
+        from zenith.server import ZenithServer
+        stdout.write("\n======================================================================\n")
+        stdout.write("           ZENITH DECISION LAYER - OPERATOR CONSOLE\n")
+        stdout.write("======================================================================\n")
+        stdout.write(f" Team / Agent:      {args.agent_name}\n")
+        stdout.write(f" Arena Endpoint:    {args.base_url}\n")
+        stdout.write(f" Model Mode:        {'MOCK (Dev)' if args.mock_model else 'REAL LAYA'}\n")
+        stdout.write(f" Server URL:        http://{args.host}:{args.port}\n")
+        stdout.write("======================================================================\n")
+        stdout.write("Starting server... Press Ctrl+C to stop.\n\n")
+        stdout.flush()
+        server = ZenithServer(
+            host=args.host,
+            port=args.port,
+            base_url=args.base_url,
+            mock_model=args.mock_model,
+        )
+        server.start(background=False)
+        return 0
 
     is_live = bool(args.live)
     game = args.game.strip().lower()

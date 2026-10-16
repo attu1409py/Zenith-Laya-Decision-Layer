@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZENITH // Laya Decision Layer Console</title>
+  <meta name="description" content="Team ZENITH Decision Layer console for TopGameAI Arena (PS 02 Beat the Bot)">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- Top Navigation & Instrument Header -->
+  <header class="console-header" id="consoleHeader">
+    <div class="header-left">
+      <div class="brand-group">
+        <span class="brand-name">ZENITH</span>
+        <span class="brand-sub">DECISION LAYER <span class="tag-ps">PS-02</span></span>
+      </div>
+      <div class="game-stage-indicator">
+        <span class="label">STAGE:</span>
+        <span class="stage-value">1 (SNAKE)</span>
+        <span class="badge-locked" title="Stage 2 unlocks after one verified Snake run scoring >= 600 points">2048 LOCKED</span>
+      </div>
+    </div>
+
+    <!-- Independent Link Status Indicators -->
+    <div class="header-center">
+      <!-- Arena Link -->
+      <div class="link-panel" id="arenaLinkPanel" data-status="disconnected">
+        <div class="link-title-row">
+          <span class="link-indicator" id="arenaIndicator"></span>
+          <span class="link-title">ARENA LINK</span>
+          <span class="link-endpoint" id="arenaEndpoint">topgameai.com</span>
+        </div>
+        <div class="link-meta-row">
+          <span class="link-status-text" id="arenaStatusText">DISCONNECTED</span>
+          <span class="link-latency" id="arenaLatency">-- ms</span>
+          <span class="link-time" id="arenaLastChecked">--:--:--</span>
+        </div>
+        <div class="link-error-banner" id="arenaErrorBanner" style="display: none;"></div>
+      </div>
+
+      <!-- Laya Link -->
+      <div class="link-panel" id="layaLinkPanel" data-status="disconnected">
+        <div class="link-title-row">
+          <span class="link-indicator" id="layaIndicator"></span>
+          <span class="link-title">LAYA RUNTIME</span>
+          <span class="badge-mock" id="layaMockBadge" style="display: none;">MOCK</span>
+          <span class="link-model" id="layaModelId">convaiinnovations/laya</span>
+        </div>
+        <div class="link-meta-row">
+          <span class="link-status-text" id="layaStatusText">DISCONNECTED</span>
+          <span class="link-latency" id="layaLatency">-- ms</span>
+          <span class="link-time" id="layaLastChecked">--:--:--</span>
+        </div>
+        <div class="link-error-banner" id="layaErrorBanner" style="display: none;"></div>
+      </div>
+
+      <!-- Derived Decision Layer Status -->
+      <div class="decision-status-panel" id="decisionStatusPanel" data-status="INACTIVE">
+        <div class="panel-label">LAYER STATUS</div>
+        <div class="decision-status-value" id="decisionStatusValue">INACTIVE</div>
+        <div class="decision-halt-reason" id="decisionHaltReason" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="header-right">
+      <button type="button" class="btn-tool" id="btnRecheck" title="Trigger immediate health check of Arena and Laya links">
+        <span class="tool-icon">⟳</span> RE-CHECK
+      </button>
+      <div class="judge-toggle-group">
+        <label for="judgeModeToggle" class="judge-label">JUDGE MODE</label>
+        <input type="checkbox" id="judgeModeToggle" class="switch-input" aria-label="Toggle high-contrast judge projector mode">
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body Container -->
+  <div class="console-body">
+    <!-- Left Sidebar: Session Controls -->
+    <aside class="control-rack" id="controlRack">
+      <div class="rack-section">
+        <div class="rack-header">SESSION CONTROLS</div>
+        
+        <div class="control-field">
+          <label for="gameSelect">GAME TARGET</label>
+          <select id="gameSelect" class="form-control">
+            <option value="snake" selected>Stage 1: Snake (Active)</option>
+            <option value="2048" disabled>Stage 2: 2048 (Locked)</option>
+          </select>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="sessionModeSelect">EXECUTION MODE</label>
+          <select id="sessionModeSelect" class="form-control">
+            <option value="dry-run" selected>Dry-Run (Simulated Arena)</option>
+            <option value="live">Live Official Arena (Judged)</option>
+          </select>
+          <div class="field-hint" id="modeHint">Simulated Arena: Safe local loop, zero network calls to competition servers.</div>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="modelModeSelect">DECISION PROVIDER</label>
+          <select id="modelModeSelect" class="form-control">
+            <option value="mock">Synthetic Model (Dev Mock)</option>
+            <option value="real">Real Laya Weights (GPU/Local)</option>
+          </select>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="maxMovesInput">MAX MOVES (DRY-RUN ONLY)</label>
+          <input type="number" id="maxMovesInput" class="form-control" value="10" min="1" max="300">
+        </div>
+
+        <div class="rack-actions">
+          <button type="button" class="btn-action btn-start" id="btnStartSession" disabled title="Start disabled until BOTH Arena and Laya links are CONNECTED (status: READY)">
+            START SESSION
+          </button>
+          <button type="button" class="btn-action btn-stop" id="btnStopSession" disabled>
+            STOP SESSION
+          </button>
+        </div>
+
+        <div class="readiness-hint" id="readinessHint">
+          Waiting for Arena and Laya links to reach READY status.
+        </div>
+      </div>
+
+      <div class="rack-section session-meta-box">
+        <div class="rack-header">SESSION METADATA</div>
+        <div class="meta-row">
+          <span class="meta-label">AGENT:</span>
+          <span class="meta-value">ZENITH</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">ACTIVE ID:</span>
+          <span class="meta-value" id="activeSessionId">NONE</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">MODE:</span>
+          <span class="meta-value" id="activeSessionMode">--</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">HASH CHAIN:</span>
+          <span class="meta-value" id="activeSessionChain">--</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="instrument-workspace">
+      <!-- Tab Bar -->
+      <nav class="workspace-tabs" role="tablist">
+        <button type="button" class="tab-button active" id="tabLiveViewer" role="tab" aria-selected="true" data-tab="live">
+          LIVE DECISION VIEWER
+        </button>
+        <button type="button" class="tab-button" id="tabLogs" role="tab" aria-selected="false" data-tab="logs">
+          SESSION LOGS
+        </button>
+      </nav>
+
+      <!-- Workspace Panes -->
+      <div class="tab-content" id="tabContent">
+        <!-- Live Viewer Pane -->
+        <section class="tab-pane active" id="paneLiveViewer" role="tabpanel">
+          <div class="empty-state-card" id="emptyStateViewer">
+            <div class="empty-title">No session yet. Connect Arena and Laya to begin.</div>
+            <p class="empty-subtitle">
+              The decision layer requires dual active links. Once both link indicators show green and the status transitions to READY, start a session to view live decisions.
+            </p>
+            <div class="diagnostic-checklist">
+              <div class="checklist-item" id="checkItemArena">
+                <span class="check-icon">○</span>
+                <span class="check-label">Arena TopGameAI API Link</span>
+                <span class="check-status" id="checkStatusArena">Checking...</span>
+              </div>
+              <div class="checklist-item" id="checkItemLaya">
+                <span class="check-icon">○</span>
+                <span class="check-label">Laya Decision Model Runtime</span>
+                <span class="check-status" id="checkStatusLaya">Checking...</span>
+              </div>
+              <div class="checklist-item" id="checkItemReady">
+                <span class="check-icon">○</span>
+                <span class="check-label">Decision Layer Derived Status</span>
+                <span class="check-status" id="checkStatusReady">INACTIVE</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Session Viewer Container (populated in Phase C) -->
+          <div class="live-active-container" id="liveActiveContainer" style="display: none;">
+            <!-- Shell placeholder ready for Phase C -->
+            <div class="panel-box">
+              <div class="panel-box-title">CURRENT GAME SESSION</div>
+              <div id="liveViewerContent"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Session Logs Pane (populated in Phase D) -->
+        <section class="tab-pane" id="paneLogs" role="tabpanel" style="display: none;">
+          <div class="empty-state-card" id="emptyStateLogs">
+            <div class="empty-title">No log records loaded.</div>
+            <p class="empty-subtitle">Session logs and cryptographic hash verification will display here once a session begins.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Bottom Instrument Status Strip -->
+  <footer class="console-footer">
+    <div class="footer-segment">
+      <span class="f-label">AGENT:</span>
+      <span class="f-val">ZENITH</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">RULE:</span>
+      <span class="f-val">PURE MODEL (NO RL / SEARCH / LOOKAHEAD)</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">FALLBACK LIMIT:</span>
+      <span class="f-val">10.0% MAX</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">AUDIT:</span>
+      <span class="f-val">APPEND-ONLY JSONL + SHA-256 HASH CHAIN</span>
+    </div>
+    <div class="footer-segment footer-right">
+      <span class="f-label">SERVER:</span>
+      <span class="f-val" id="footerServerAddr">127.0.0.1:8080</span>
+      <span class="f-sep">|</span>
+      <span class="f-label">POLL:</span>
+      <span class="f-val" id="footerPollRate">3000ms</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -389,6 +389,23 @@ class TestCliExecution(unittest.TestCase):
 
         self.assertEqual(code, 0)
 
+    def test_cli_serve_flag_launches_server(self):
+        """Verify that passing --serve initializes and starts ZenithServer."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with patch("zenith.server.ZenithServer.start") as mock_start:
+            code = run_cli(
+                ["--serve", "--port", "9090", "--mock-model"],
+                stdout=stdout,
+                stderr=stderr,
+            )
+            mock_start.assert_called_once_with(background=False)
+
+        self.assertEqual(code, 0)
+        self.assertIn("ZENITH DECISION LAYER - OPERATOR CONSOLE", stdout.getvalue())
+        self.assertIn("http://127.0.0.1:9090", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
