@@ -249,6 +249,26 @@ class TestZenithServer(unittest.TestCase):
         self.assertEqual(log_resp["session_id"], session_id)
         self.assertEqual(log_resp["count"], 2)
 
+        # Test CSV export on benchmark log located in subfolder logs/benchmarks/
+        code, _, bench_csv = self._get("/api/logs/export-csv?session_id=bench-2048-v3-13")
+        self.assertEqual(code, 200)
+        # Check UTF-8 BOM prefix
+        self.assertTrue(bench_csv.startswith(b"\xef\xbb\xbf"))
+        self.assertIn(b"step,action,result", bench_csv)
+
+        # Test CSV export with view=inline (no BOM, text/plain)
+        code, _, inline_csv = self._get(f"/api/logs/export-csv?session_id={session_id}&view=inline")
+        self.assertEqual(code, 200)
+        self.assertFalse(inline_csv.startswith(b"\xef\xbb\xbf"))
+        self.assertTrue(inline_csv.startswith(b"step,action,result"))
+
+        # Test CSV export without session_id (graceful fallback to most recent log)
+        code, _, fallback_csv = self._get("/api/logs/export-csv")
+        self.assertEqual(code, 200)
+        self.assertTrue(fallback_csv.startswith(b"\xef\xbb\xbf"))
+        self.assertIn(b"step,action,result", fallback_csv)
+
 
 if __name__ == "__main__":
     unittest.main()
+

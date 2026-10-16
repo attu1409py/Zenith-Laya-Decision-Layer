@@ -141,8 +141,14 @@
       <!-- Quick Export Actions Panel -->
       <div class="rack-section export-rack-section">
         <div class="rack-header">AUDIT & EXPORT</div>
-        <button type="button" class="btn-export-tool" id="btnExportCsv" title="Export session steps to CSV">
+        <button type="button" class="btn-export-tool" id="btnExportCsv" title="Download session steps as CSV to disk">
           EXPORT AS .CSV
+        </button>
+        <button type="button" class="btn-export-tool" id="btnPreviewCsvSidebar" title="Open and preview CSV spreadsheet on screen">
+          VIEW / PREVIEW CSV
+        </button>
+        <button type="button" class="btn-export-tool" id="btnOpenCsvTabSidebar" title="Open raw CSV in a new browser tab">
+          OPEN CSV (NEW TAB) ↗
         </button>
         <button type="button" class="btn-export-tool" id="btnExportPdf" title="Export audit report as PDF">
           EXPORT AS .PDF
@@ -407,10 +413,12 @@
                 </div>
               </div>
               <div class="toolbar-right">
-                <button type="button" class="btn-tool" id="btnLogsExportCsv">CSV</button>
-                <button type="button" class="btn-tool" id="btnLogsExportPdf">PDF</button>
-                <button type="button" class="btn-tool" id="btnLogsDownload">.JSONL</button>
-                <button type="button" class="btn-tool" id="btnLogsVerify">VERIFY</button>
+                <button type="button" class="btn-tool" id="btnLogsExportCsv" title="Download .csv file to disk">EXPORT CSV</button>
+                <button type="button" class="btn-tool" id="btnLogsPreviewCsv" title="Open and preview CSV text on screen">PREVIEW CSV</button>
+                <button type="button" class="btn-tool" id="btnLogsOpenCsvTab" title="Open raw CSV in a new browser tab">OPEN CSV ↗</button>
+                <button type="button" class="btn-tool" id="btnLogsExportPdf" title="Download audit report as PDF">PDF</button>
+                <button type="button" class="btn-tool" id="btnLogsDownload" title="Download raw JSONL record">.JSONL</button>
+                <button type="button" class="btn-tool" id="btnLogsVerify" title="Verify cryptographic SHA-256 hash chain">VERIFY</button>
               </div>
             </div>
 
@@ -480,6 +488,39 @@
           <div class="drawer-section-title">STATE AFTER MOVE</div>
           <pre class="json-viewer mono" id="drawerStateAfterJson"></pre>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSV Preview Modal -->
+  <div class="modal-overlay" id="csvPreviewModal" style="display: none;">
+    <div class="drawer-panel" style="width: 1060px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="drawer-header">
+        <span class="drawer-title" id="csvPreviewTitle">SESSION CSV PREVIEW</span>
+        <button type="button" class="btn-close" id="btnCsvModalClose">&times;</button>
+      </div>
+      <div class="drawer-body" style="display: flex; flex-direction: column; overflow: hidden; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span class="mono" id="csvPreviewStats" style="color: var(--text-muted); font-size: 0.72rem; white-space: nowrap;">0 rows</span>
+            <div class="log-filter-group">
+              <button type="button" class="btn-filter active" id="btnCsvViewTable">TABLE VIEW</button>
+              <button type="button" class="btn-filter" id="btnCsvViewRaw">RAW CSV</button>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-tool" id="btnCopyCsvText">COPY CSV</button>
+            <button type="button" class="btn-tool" id="btnOpenCsvTabFromModal">OPEN IN NEW TAB ↗</button>
+            <button type="button" class="btn-tool btn-primary" id="btnDownloadCsvFromModal">DOWNLOAD .CSV</button>
+          </div>
+        </div>
+        <div id="csvTableContainer" style="overflow: auto; max-height: 520px; border: 1px solid var(--border-subtle); border-radius: 2px;">
+          <table class="logs-table mono" id="csvTableView" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+            <thead id="csvTableThead"></thead>
+            <tbody id="csvTableTbody"></tbody>
+          </table>
+        </div>
+        <pre class="json-viewer mono" id="csvPreviewContent" style="display: none; white-space: pre; overflow-x: auto; max-height: 520px; font-size: 0.70rem; line-height: 1.3; margin: 0;"></pre>
       </div>
     </div>
   </div>

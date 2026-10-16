@@ -45,6 +45,35 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _find_session_log(log_dir: Union[str, Path], session_id: Optional[str]) -> Optional[Path]:
+    """Safely locate a session JSONL file in log_dir or its subdirectories.
+
+    Prevents directory traversal and checks root logs/, benchmarks/, and subfolders.
+    """
+    if not session_id or not isinstance(session_id, str):
+        return None
+    safe_name = Path(session_id.strip()).name
+    if not safe_name or safe_name.startswith("."):
+        return None
+    base = Path(log_dir).resolve()
+    # 1. Direct path
+    direct = base / f"{safe_name}.jsonl"
+    if direct.exists() and direct.is_file():
+        return direct
+    # 2. Benchmarks subfolder
+    bench = base / "benchmarks" / f"{safe_name}.jsonl"
+    if bench.exists() and bench.is_file():
+        return bench
+    # 3. Recursive glob fallback
+    try:
+        for p in base.rglob(f"{safe_name}.jsonl"):
+            if p.is_file():
+                return p
+    except Exception:
+        pass
+    return None
+
+
 @dataclass
 class LinkHealth:
     """Status record for an external link."""
@@ -369,12 +398,17 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
             session_id = query.get("session_id", [None])[0]
             if not session_id and server and server._active_session_data:
                 session_id = server._active_session_data.get("session_id")
+            log_dir = Path(server.log_dir if server else "logs")
+            if not session_id:
+                # Graceful fallback: check most recent session in log directory
+                all_logs = sorted(log_dir.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+                if all_logs:
+                    session_id = all_logs[0].stem
             if not session_id:
                 self._send_error_json("Missing session_id parameter", 400)
                 return
-            log_dir = Path(server.log_dir if server else "logs")
-            log_path = log_dir / f"{session_id}.jsonl"
-            if not log_path.exists():
+            log_path = _find_session_log(log_dir, session_id)
+            if not log_path or not log_path.exists():
                 self._send_error_json(f"Session log not found: {session_id}", 404)
                 return
             try:
@@ -382,10 +416,25 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._send_error_json(f"CSV export failed: {exc}", 500)
                 return
-            csv_bytes = csv_text.encode("utf-8")
+
+            clean_id = session_id.replace(".jsonl", "").replace(".csv", "")
+            view_mode = query.get("view", ["download"])[0].lower()
+
+            if view_mode in ("inline", "raw"):
+                raw_bytes = csv_text.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Disposition", f'inline; filename="{clean_id}.csv"')
+                self.send_header("Content-Length", str(len(raw_bytes)))
+                self.end_headers()
+                self.wfile.write(raw_bytes)
+                return
+
+            # Add UTF-8 BOM for immediate, seamless opening in Microsoft Excel and Apple Numbers
+            csv_bytes = b"\xef\xbb\xbf" + csv_text.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
-            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.csv"')
+            self.send_header("Content-Disposition", f'attachment; filename="{clean_id}.csv"')
             self.send_header("Content-Length", str(len(csv_bytes)))
             self.end_headers()
             self.wfile.write(csv_bytes)
@@ -400,8 +449,8 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error_json("Missing session_id parameter", 400)
                 return
             log_dir = Path(server.log_dir if server else "logs")
-            log_path = log_dir / f"{session_id}.jsonl"
-            if not log_path.exists():
+            log_path = _find_session_log(log_dir, session_id)
+            if not log_path or not log_path.exists():
                 self._send_error_json(f"Session log not found: {session_id}", 404)
                 return
             with open(log_path, "rb") as f:
@@ -423,8 +472,8 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error_json("Missing session_id parameter", 400)
                 return
             log_dir = Path(server.log_dir if server else "logs")
-            log_path = log_dir / f"{session_id}.jsonl"
-            if not log_path.exists():
+            log_path = _find_session_log(log_dir, session_id)
+            if not log_path or not log_path.exists():
                 self._send_error_json(f"Session log not found: {session_id}", 404)
                 return
             res = verify_jsonl_file(log_path)
@@ -446,8 +495,8 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error_json("Missing session_id parameter", 400)
                 return
             log_dir = Path(server.log_dir if server else "logs")
-            log_path = log_dir / f"{session_id}.jsonl"
-            if not log_path.exists():
+            log_path = _find_session_log(log_dir, session_id)
+            if not log_path or not log_path.exists():
                 self._send_error_json(f"Session log not found: {session_id}", 404)
                 return
             try:
@@ -466,14 +515,17 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/sessions":
             log_dir = Path(server.log_dir if server else "logs")
             sessions = []
+            seen_ids = set()
             if log_dir.exists():
-                for p in sorted(log_dir.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True):
+                for p in sorted(log_dir.rglob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True):
                     s_id = p.stem
-                    # Quick metadata check
+                    if s_id in seen_ids or s_id.startswith("run_history"):
+                        continue
+                    seen_ids.add(s_id)
                     mtime_iso = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                     game = "snake" if "snake" in s_id.lower() else ("2048" if "2048" in s_id.lower() else "unknown")
                     mode = "live" if s_id.lower().startswith("live") else "mock"
-                    final_path = log_dir / f"{s_id}_final.json"
+                    final_path = p.with_name(f"{s_id}_final.json")
                     sessions.append({
                         "session_id": s_id,
                         "game": game,
@@ -494,8 +546,8 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error_json("Missing session_id parameter", 400)
                 return
             log_dir = Path(server.log_dir if server else "logs")
-            log_path = log_dir / f"{session_id}.jsonl"
-            if not log_path.exists():
+            log_path = _find_session_log(log_dir, session_id)
+            if not log_path or not log_path.exists():
                 self._send_error_json(f"Session log not found: {session_id}", 404)
                 return
             with open(log_path, "r", encoding="utf-8") as f:
@@ -678,6 +730,12 @@ class ZenithServer:
                 "log_path": res.log_path,
                 "error": res.error,
             }
+        if res.log_path:
+            try:
+                from zenith.csv_export import export_session_to_csv_file
+                export_session_to_csv_file(res.log_path)
+            except Exception:
+                pass
         self._broadcast_event("session_finished", self._active_session_data or {})
 
     def _run_session_worker(

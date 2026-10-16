@@ -32,14 +32,16 @@ CSV_FIELDNAMES = [
 ]
 
 
-def records_to_csv_text(records: Sequence[Mapping[str, Any]]) -> str:
-    """Convert sequence of session JSONL records to CSV string."""
+def records_to_csv_text(records: Sequence[Mapping[str, Any]], lineterminator: str = "\r\n") -> str:
+    """Convert sequence of session JSONL records to RFC 4180-compliant CSV string."""
     out = io.StringIO()
-    writer = csv.writer(out, lineterminator="\n")
+    writer = csv.writer(out, lineterminator=lineterminator)
     writer.writerow(CSV_FIELDNAMES)
 
     for rec in records:
-        step = rec.get("step", 0)
+        step = rec.get("step")
+        if step is None:
+            continue
         action = rec.get("action", "")
         result = rec.get("result", "")
         decision = rec.get("decision", {}) or {}
@@ -88,7 +90,30 @@ def export_session_to_csv(log_path: Union[str, Path]) -> str:
         raise FileNotFoundError(f"Log file {log_path} not found.")
 
     with open(path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        lines = [line for line in f if line.strip()]
 
     records = read_jsonl_records(lines)
     return records_to_csv_text(records)
+
+
+def export_session_to_csv_file(
+    log_path: Union[str, Path],
+    out_csv_path: Optional[Union[str, Path]] = None,
+    with_bom: bool = True,
+) -> Path:
+    """Read session JSONL and write RFC-4180 CSV file to disk with optional UTF-8 BOM."""
+    src = Path(log_path)
+    if not src.exists():
+        raise FileNotFoundError(f"Log file {log_path} not found.")
+
+    dest = Path(out_csv_path) if out_csv_path else src.with_suffix(".csv")
+    csv_text = export_session_to_csv(src)
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "wb") as f:
+        if with_bom:
+            f.write(b"\xef\xbb\xbf")
+        f.write(csv_text.encode("utf-8"))
+
+    return dest
+

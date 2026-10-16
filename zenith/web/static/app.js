@@ -123,8 +123,28 @@
   const btnLiveVerify = document.getElementById('btnLiveVerify');
   const btnLogsExportCsv = document.getElementById('btnLogsExportCsv');
   const btnLogsExportPdf = document.getElementById('btnLogsExportPdf');
+  const btnLogsPreviewCsv = document.getElementById('btnLogsPreviewCsv');
+  const btnLogsOpenCsvTab = document.getElementById('btnLogsOpenCsvTab');
   const btnLogsDownload = document.getElementById('btnLogsDownload');
   const btnLogsVerify = document.getElementById('btnLogsVerify');
+  const btnPreviewCsvSidebar = document.getElementById('btnPreviewCsvSidebar');
+  const btnOpenCsvTabSidebar = document.getElementById('btnOpenCsvTabSidebar');
+
+  // CSV Preview Modal Elements
+  const csvPreviewModal = document.getElementById('csvPreviewModal');
+  const csvPreviewTitle = document.getElementById('csvPreviewTitle');
+  const csvPreviewStats = document.getElementById('csvPreviewStats');
+  const csvPreviewContent = document.getElementById('csvPreviewContent');
+  const btnCsvModalClose = document.getElementById('btnCsvModalClose');
+  const btnCopyCsvText = document.getElementById('btnCopyCsvText');
+  const btnDownloadCsvFromModal = document.getElementById('btnDownloadCsvFromModal');
+  const btnOpenCsvTabFromModal = document.getElementById('btnOpenCsvTabFromModal');
+  const btnCsvViewTable = document.getElementById('btnCsvViewTable');
+  const btnCsvViewRaw = document.getElementById('btnCsvViewRaw');
+  const csvTableContainer = document.getElementById('csvTableContainer');
+  const csvTableView = document.getElementById('csvTableView');
+  const csvTableThead = document.getElementById('csvTableThead');
+  const csvTableTbody = document.getElementById('csvTableTbody');
 
   // Logs Elements
   const sessionPickerSelect = document.getElementById('sessionPickerSelect');
@@ -551,29 +571,69 @@
 
   // --- Export Actions ---
   function getActiveSessionId() {
+    if (sessionPickerSelect && sessionPickerSelect.value && sessionPickerSelect.value !== '__active__') {
+      return sessionPickerSelect.value;
+    }
     if (currentSession && currentSession.session_id) {
       return currentSession.session_id;
     }
-    const txt = activeSessionId.textContent.trim();
-    return txt !== 'NONE' && txt !== '--' ? txt : null;
+    const txt = activeSessionId ? activeSessionId.textContent.trim() : '';
+    if (txt && txt !== 'NONE' && txt !== '--') {
+      return txt;
+    }
+    // If no active session, check if any past session is available in picker
+    if (sessionPickerSelect && sessionPickerSelect.options && sessionPickerSelect.options.length > 1) {
+      return sessionPickerSelect.options[1].value;
+    }
+    return null;
+  }
+
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function triggerDirectDownload(url, defaultFilename) {
+    const a = document.createElement('a');
+    a.href = url;
+    if (defaultFilename) a.download = defaultFilename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) document.body.removeChild(a);
+    }, 300);
   }
 
   function exportCsv() {
     const sId = getActiveSessionId();
     if (!sId) {
-      alert('No active or previous session selected to export.');
+      alert('No active or previous session selected to export. Please start a session or select one from the session picker.');
       return;
     }
-    window.location.href = `/api/logs/export-csv?session_id=${encodeURIComponent(sId)}`;
+    triggerDirectDownload(`/api/logs/export-csv?session_id=${encodeURIComponent(sId)}`, `${sId}.csv`);
+  }
+
+  function openCsvTab() {
+    const sId = getActiveSessionId();
+    if (!sId) {
+      alert('No session selected or available to open. Please start a session or select one from the session picker.');
+      return;
+    }
+    window.open(`/api/logs/export-csv?session_id=${encodeURIComponent(sId)}&view=inline`, '_blank');
   }
 
   function downloadJsonl() {
     const sId = getActiveSessionId();
     if (!sId) {
-      alert('No active or previous session selected to download.');
+      alert('No active or previous session selected to download. Please start a session or select one from the session picker.');
       return;
     }
-    window.location.href = `/api/logs/download?session_id=${encodeURIComponent(sId)}`;
+    triggerDirectDownload(`/api/logs/download?session_id=${encodeURIComponent(sId)}`, `${sId}.jsonl`);
   }
 
   async function verifyChain() {
@@ -607,24 +667,174 @@
   function exportPdf() {
     const sId = getActiveSessionId();
     if (!sId) {
-      alert('No active or previous session selected to export.');
+      alert('No active or previous session selected to export. Please start a session or select one from the session picker.');
       return;
     }
-    window.location.href = `/api/logs/export-pdf?session_id=${encodeURIComponent(sId)}`;
+    triggerDirectDownload(`/api/logs/export-pdf?session_id=${encodeURIComponent(sId)}`, `${sId}_audit_report.pdf`);
   }
 
   btnExportCsv.addEventListener('click', exportCsv);
+  if (btnPreviewCsvSidebar) btnPreviewCsvSidebar.addEventListener('click', openCsvPreview);
+  if (btnOpenCsvTabSidebar) btnOpenCsvTabSidebar.addEventListener('click', openCsvTab);
   if (btnExportPdf) btnExportPdf.addEventListener('click', exportPdf);
   btnDownloadJsonl.addEventListener('click', downloadJsonl);
   btnVerifyChain.addEventListener('click', verifyChain);
+
   btnLiveExportCsv.addEventListener('click', exportCsv);
   if (btnLiveExportPdf) btnLiveExportPdf.addEventListener('click', exportPdf);
   btnLiveDownloadJsonl.addEventListener('click', downloadJsonl);
   btnLiveVerify.addEventListener('click', verifyChain);
+
   btnLogsExportCsv.addEventListener('click', exportCsv);
+  if (btnLogsPreviewCsv) btnLogsPreviewCsv.addEventListener('click', openCsvPreview);
+  if (btnLogsOpenCsvTab) btnLogsOpenCsvTab.addEventListener('click', openCsvTab);
   if (btnLogsExportPdf) btnLogsExportPdf.addEventListener('click', exportPdf);
   btnLogsDownload.addEventListener('click', downloadJsonl);
   btnLogsVerify.addEventListener('click', verifyChain);
+
+  // CSV Parsing and Spreadsheet Viewer
+  function parseCsvRows(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (!lines.length || !lines[0].trim()) return { headers: [], rows: [] };
+    const parseLine = (line) => {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          inQuotes = !inQuotes;
+        } else if (c === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    };
+    const headers = parseLine(lines[0]);
+    const rows = lines.slice(1).filter(l => l.trim()).map(parseLine);
+    return { headers, rows };
+  }
+
+  function renderCsvSpreadsheet(headers, rows) {
+    if (!csvTableThead || !csvTableTbody) return;
+    csvTableThead.innerHTML = `<tr>${headers.map(h => `<th style="padding: 7px 10px; text-align: left; background: var(--bg-surface-2); color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; z-index: 2;">${escapeHtml(h.toUpperCase())}</th>`).join('')}</tr>`;
+
+    if (!rows.length) {
+      csvTableTbody.innerHTML = `<tr><td colspan="${headers.length || 1}" style="text-align: center; padding: 20px; color: var(--text-muted);">No records found in CSV</td></tr>`;
+      return;
+    }
+
+    csvTableTbody.innerHTML = rows.map((r) => {
+      return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.72rem;">${r.map((cell, cIdx) => {
+        const header = (headers[cIdx] || '').toLowerCase();
+        let formatted = escapeHtml(cell);
+        if (header === 'result') {
+          if (cell === 'applied') formatted = `<span class="res-tag res-applied">APPLIED</span>`;
+          else if (cell === 'rejected') formatted = `<span class="res-tag res-rejected">REJECTED</span>`;
+          else if (cell === 'fallback') formatted = `<span class="res-tag res-fallback">FALLBACK</span>`;
+        } else if (header === 'source') {
+          if (cell === 'laya') formatted = `<span class="source-tag source-laya">LAYA</span>`;
+          else if (cell === 'fallback') formatted = `<span class="source-tag source-fallback">FALLBACK</span>`;
+        } else if (header === 'action' || header === 'chosen') {
+          formatted = `<span style="font-weight: 600; color: var(--text-main);">${escapeHtml(cell.toUpperCase())}</span>`;
+        } else if (header === 'hash' || header === 'prev_hash') {
+          formatted = `<span style="color: var(--text-muted);" title="${escapeHtml(cell)}">${escapeHtml(cell.slice(0, 10))}...</span>`;
+        }
+        return `<td style="padding: 6px 10px; white-space: nowrap;">${formatted}</td>`;
+      }).join('')}</tr>`;
+    }).join('');
+  }
+
+  // CSV Preview Modal Wiring
+  async function openCsvPreview() {
+    const sId = getActiveSessionId();
+    if (!sId) {
+      alert('No active or previous session selected to preview. Please start a session or select one from the session picker.');
+      return;
+    }
+    try {
+      if (csvPreviewTitle) csvPreviewTitle.textContent = `${sId}.csv // INTERACTIVE SPREADSHEET`;
+      if (csvPreviewStats) csvPreviewStats.textContent = 'Loading CSV data...';
+      if (csvTableTbody) csvTableTbody.innerHTML = '<tr><td style="padding: 16px; text-align: center; color: var(--text-muted);">Fetching CSV from server...</td></tr>';
+      if (csvPreviewContent) csvPreviewContent.textContent = 'Loading CSV data...';
+      if (csvPreviewModal) csvPreviewModal.style.display = 'flex';
+
+      // Default to table view
+      if (btnCsvViewTable) btnCsvViewTable.classList.add('active');
+      if (btnCsvViewRaw) btnCsvViewRaw.classList.remove('active');
+      if (csvTableContainer) csvTableContainer.style.display = 'block';
+      if (csvPreviewContent) csvPreviewContent.style.display = 'none';
+
+      const resp = await fetch(`/api/logs/export-csv?session_id=${encodeURIComponent(sId)}&view=raw`);
+      if (!resp.ok) {
+        let msg = `Server returned HTTP ${resp.status}`;
+        try {
+          const err = await resp.json();
+          if (err && err.error) msg = err.error;
+        } catch (_) {}
+        if (csvPreviewStats) csvPreviewStats.textContent = 'Error loading CSV';
+        if (csvTableTbody) csvTableTbody.innerHTML = `<tr><td style="padding: 16px; color: var(--color-danger); text-align: center;">Error loading CSV: ${escapeHtml(msg)}</td></tr>`;
+        if (csvPreviewContent) csvPreviewContent.textContent = `Error loading CSV: ${msg}`;
+        return;
+      }
+      const rawText = await resp.text();
+      const cleanText = rawText.replace(/^\ufeff/, '');
+      if (csvPreviewContent) csvPreviewContent.textContent = cleanText;
+
+      const { headers, rows } = parseCsvRows(cleanText);
+      renderCsvSpreadsheet(headers, rows);
+      if (csvPreviewStats) csvPreviewStats.textContent = `${rows.length} move records | 16 audit columns | UTF-8 | RFC-4180`;
+    } catch (err) {
+      if (csvPreviewStats) csvPreviewStats.textContent = 'Network error';
+      if (csvTableTbody) csvTableTbody.innerHTML = `<tr><td style="padding: 16px; color: var(--color-danger); text-align: center;">Network error: ${escapeHtml(err.message)}</td></tr>`;
+      if (csvPreviewContent) csvPreviewContent.textContent = `Network error loading CSV: ${err.message}`;
+    }
+  }
+
+  if (btnCsvModalClose) btnCsvModalClose.addEventListener('click', () => { if (csvPreviewModal) csvPreviewModal.style.display = 'none'; });
+  if (csvPreviewModal) csvPreviewModal.addEventListener('click', (e) => {
+    if (e.target === csvPreviewModal) csvPreviewModal.style.display = 'none';
+  });
+
+  if (btnCsvViewTable) {
+    btnCsvViewTable.addEventListener('click', () => {
+      btnCsvViewTable.classList.add('active');
+      if (btnCsvViewRaw) btnCsvViewRaw.classList.remove('active');
+      if (csvTableContainer) csvTableContainer.style.display = 'block';
+      if (csvPreviewContent) csvPreviewContent.style.display = 'none';
+    });
+  }
+
+  if (btnCsvViewRaw) {
+    btnCsvViewRaw.addEventListener('click', () => {
+      btnCsvViewRaw.classList.add('active');
+      if (btnCsvViewTable) btnCsvViewTable.classList.remove('active');
+      if (csvTableContainer) csvTableContainer.style.display = 'none';
+      if (csvPreviewContent) csvPreviewContent.style.display = 'block';
+    });
+  }
+
+  if (btnCopyCsvText) {
+    btnCopyCsvText.addEventListener('click', () => {
+      if (csvPreviewContent && csvPreviewContent.textContent) {
+        navigator.clipboard.writeText(csvPreviewContent.textContent);
+        btnCopyCsvText.textContent = 'COPIED!';
+        setTimeout(() => { btnCopyCsvText.textContent = 'COPY CSV'; }, 1500);
+      }
+    });
+  }
+
+  if (btnOpenCsvTabFromModal) {
+    btnOpenCsvTabFromModal.addEventListener('click', openCsvTab);
+  }
+
+  if (btnDownloadCsvFromModal) {
+    btnDownloadCsvFromModal.addEventListener('click', exportCsv);
+  }
 
   // --- Health UI Updates ---
   function updateHealthUI(data) {

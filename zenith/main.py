@@ -539,6 +539,14 @@ def run_cli(
         stderr.write("\n[CRITICAL AUDIT FAILURE] Log file hash chain verification failed!\n")
         return 3
 
+    csv_path = None
+    if result.log_path:
+        try:
+            from zenith.csv_export import export_session_to_csv_file
+            csv_path = export_session_to_csv_file(result.log_path)
+        except Exception:
+            pass
+
     # Display clear summary banner
     stdout.write(
         "\n"
@@ -557,6 +565,7 @@ def run_cli(
         f" Fallback Moves:       {result.fallback_moves}\n"
         f" Session Duration:     {result.total_time_ms} ms\n"
         f" Output JSONL Log:     {result.log_path}\n"
+        f" Output CSV Export:    {csv_path or 'N/A'}\n"
         f" SHA-256 Hash Chain:   {'VERIFIED VALID' if result.hash_chain_valid else 'UNKNOWN'}\n"
         "======================================================================\n"
     )
