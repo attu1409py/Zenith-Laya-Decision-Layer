@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from zenith.arena_client import ArenaClient, ArenaError
 from zenith.csv_export import export_session_to_csv
