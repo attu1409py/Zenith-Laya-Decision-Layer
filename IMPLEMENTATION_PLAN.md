@@ -43,7 +43,7 @@ The new repo should not copy the custom game engines just to satisfy the competi
 |---|---|---|---|---|
 | M0 | Repository and source preflight | Fast/low-cost model is sufficient | Dedicated repo confirmed; guide and docs read; Laya interface gaps identified; `PROJECT_STATE.md` updated | Completed (2026-10-16) |
 | Task 01 | Scaffolding & SHA-256 audit engine | Standard model | Git repo initialized, .gitignore configured, canonical JSON & SHA-256 hash-chain verified (24/24 tests pass) | Completed (2026-10-16) |
-| M1 | Confirm Laya runtime/API | Strong reasoning model if schema/docs are ambiguous | Official runtime and response schema documented; safe test decision confirmed; credentials kept secret | Blocked until source info provided |
+| M1 (Task 05A) | Confirm & install Laya runtime | Strong reasoning model if schema/docs are ambiguous | Official package laya==0.4.8 & convaiinnovations/laya loaded on GPU; single forward pass verified (334 ms); contract valid | Completed (2026-10-16) |
 | M2 (Task 02) | Arena API client | Mid-tier coding model; use stronger model for ambiguous parsing/error handling | Create session, get state, send action, capture final response; mocked unit tests pass (18/18 tests pass) | Completed (2026-10-16) |
 | M3 (Task 03) | Decision validation and logger | Strong reasoning/coding model | Probability/action/confidence validation passes tests; JSONL schema complete; SHA-256 chain integrated | Completed (2026-10-16) |
 | M4 (Task 04) | Visible decision viewer + mock runner | Mid/high coding model | Viewer stays visible; runner loop tested with mocks; no unverified live submission (22+14 = 36 new tests, 116 total) | Completed (2026-10-16) |

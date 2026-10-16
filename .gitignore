@@ -64,6 +64,14 @@ tmp/
 temp/
 *.log
 
+# Model weights, checkpoint directories, and Hugging Face caches
+models/
+checkpoints/
+*.safetensors
+*.bin
+.cache/
+hf_cache/
+
 # Preserved submission directory (do not ignore official submission logs)
 # Usage: official submission jsonl files should be placed in submission_logs/
 !submission_logs/*.jsonl
