@@ -146,10 +146,15 @@ class TestZenithServer(unittest.TestCase):
         # 4. Stop session
         stop_code, stop_resp = self._post("/api/session/stop")
         self.assertEqual(stop_code, 200)
-        self.assertEqual(stop_resp["session"]["status"], "FINISHED")
+        self.assertIn(stop_resp["session"]["status"], ("STOPPING", "FINISHED"))
 
-        # 5. Confirm session is now inactive
-        code, final_curr, _ = self._get("/api/session/current")
+        # 5. Confirm session is now or soon inactive
+        import time
+        for _ in range(20):
+            code, final_curr, _ = self._get("/api/session/current")
+            if not final_curr["active"]:
+                break
+            time.sleep(0.05)
         self.assertFalse(final_curr["active"])
 
     def test_start_session_fails_if_decision_layer_inactive(self) -> None:
@@ -195,6 +200,54 @@ class TestZenithServer(unittest.TestCase):
         code, _, data = self._get("/app.js")
         self.assertEqual(code, 200)
         self.assertIn(b"updateHealthUI", data)
+
+    def test_session_start_2048_and_export_csv(self) -> None:
+        import time
+        # Start a 2048 dry-run session with 2 moves
+        code, start_resp = self._post("/api/session/start", {
+            "game": "2048",
+            "mode": "dry-run",
+            "mock_model": True,
+            "max_moves": 2,
+        })
+        self.assertEqual(code, 200)
+        session_id = start_resp["session"]["session_id"]
+        self.assertIn("2048", session_id)
+
+        # Wait for session to finish
+        for _ in range(30):
+            time.sleep(0.05)
+            _, curr, _ = self._get("/api/session/current")
+            if not curr["active"]:
+                break
+
+        # Test CSV export
+        code, _, csv_data = self._get(f"/api/logs/export-csv?session_id={session_id}")
+        self.assertEqual(code, 200)
+        self.assertIn(b"step,action,result", csv_data)
+        self.assertIn(b"laya", csv_data)
+
+        # Test verification endpoint
+        code, verify_resp, _ = self._get(f"/api/logs/verify?session_id={session_id}")
+        self.assertEqual(code, 200)
+        self.assertTrue(verify_resp["is_valid"])
+
+        # Test PDF export
+        code, _, pdf_data = self._get(f"/api/logs/export-pdf?session_id={session_id}")
+        self.assertEqual(code, 200)
+        self.assertTrue(pdf_data.startswith(b"%PDF"))
+
+        # Test sessions list
+        code, sessions_resp, _ = self._get("/api/sessions")
+        self.assertEqual(code, 200)
+        self.assertTrue(len(sessions_resp["sessions"]) > 0)
+        self.assertTrue(any(s["session_id"] == session_id for s in sessions_resp["sessions"]))
+
+        # Test session records endpoint
+        code, log_resp, _ = self._get(f"/api/logs/session?session_id={session_id}")
+        self.assertEqual(code, 200)
+        self.assertEqual(log_resp["session_id"], session_id)
+        self.assertEqual(log_resp["count"], 2)
 
 
 if __name__ == "__main__":

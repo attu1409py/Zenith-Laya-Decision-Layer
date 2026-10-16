@@ -116,6 +116,8 @@ class SessionRunner:
         *,
         max_consecutive_errors: int = 5,
         max_consecutive_rejections: int = 10,
+        on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_complete: Optional[Callable[[SessionResult], None]] = None,
     ):
         """Initialize the session runner.
 
@@ -127,6 +129,8 @@ class SessionRunner:
             fallback_tracker: FallbackTracker instance (created if None).
             max_consecutive_errors: Stop after this many consecutive errors.
             max_consecutive_rejections: Stop after this many consecutive rejected moves.
+            on_step: Optional callback called after each move record is logged.
+            on_complete: Optional callback called when session completes.
         """
         self._arena = arena
         self._decide_fn = decide_fn
@@ -135,6 +139,13 @@ class SessionRunner:
         self._fallback = fallback_tracker or FallbackTracker()
         self._max_consecutive_errors = max_consecutive_errors
         self._max_consecutive_rejections = max_consecutive_rejections
+        self._on_step = on_step
+        self._on_complete = on_complete
+        self._stop_requested: bool = False
+
+    def stop(self) -> None:
+        """Signal the runner to halt cleanly after current step."""
+        self._stop_requested = True
 
     def run(self, initial_session_data: Optional[Dict[str, Any]] = None) -> SessionResult:
         """Execute the game session loop and return the result.
@@ -170,6 +181,10 @@ class SessionRunner:
                 return result
 
         while not done:
+            if self._stop_requested:
+                result.error = "Session stopped by operator."
+                break
+
             turn_watch = MonotonicStopwatch()
 
             # Extract current state from session data
@@ -267,8 +282,9 @@ class SessionRunner:
             # Note: The step value for rejected moves is ambiguous per the
             # guide. We use step+1 tentatively; the logger accepts whatever
             # caller supplies. This is an unresolved blocker per PROJECT_STATE.
+            logged_record: Dict[str, Any] = {}
             try:
-                self._logger.log_move(
+                logged_record = self._logger.log_move(
                     step=log_step if move_result == "rejected" else step,
                     state_before=dict(state_before),
                     action=action,
@@ -307,6 +323,33 @@ class SessionRunner:
                 won=won,
             )
 
+            if self._on_step is not None:
+                try:
+                    self._on_step({
+                        "session_id": session_id,
+                        "game": game,
+                        "step": step,
+                        "action": action,
+                        "result": move_result,
+                        "state_before": dict(state_before),
+                        "state_after": dict(state_after),
+                        "decision": dict(validated_decision),
+                        "timing": dict(timing),
+                        "score": new_score,
+                        "done": done,
+                        "won": won,
+                        "hash": logged_record.get("hash"),
+                        "prev_hash": logged_record.get("prev_hash"),
+                        "ts": logged_record.get("ts"),
+                        "total_moves": result.total_moves,
+                        "applied_moves": result.applied_moves,
+                        "rejected_moves": result.rejected_moves,
+                        "fallback_moves": result.fallback_moves,
+                        "fallback_pct": (result.fallback_moves / result.total_moves * 100.0) if result.total_moves > 0 else 0.0,
+                    })
+                except Exception:
+                    pass
+
             # Update session_data for next iteration
             session_data = response
 
@@ -335,6 +378,12 @@ class SessionRunner:
             hash_chain_valid=result.hash_chain_valid,
             total_time_ms=result.total_time_ms,
         )
+
+        if self._on_complete is not None:
+            try:
+                self._on_complete(result)
+            except Exception:
+                pass
 
         return result
 

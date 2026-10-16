@@ -1,9 +1,11 @@
-"""HTTP Server and Health Monitoring for Team ZENITH Decision Layer.
+"""HTTP Server and Real-Time Event Streaming for Team ZENITH Decision Layer.
 
 Provides:
 1. Safe read-only health checks for TopGameAI Arena and Laya model links.
 2. Derived decision layer status: INACTIVE, READY, ACTIVE, HALTED.
 3. Threading HTTP server serving static frontend assets and REST/SSE endpoints.
+4. Live SSE event streaming (/api/session/events) for sub-second UI updates.
+5. CSV export (/api/logs/export-csv), log verification, and raw download.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import queue
 import socket
 import sys
 import threading
@@ -21,10 +24,18 @@ from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from zenith.arena_client import ArenaClient, ArenaError
-from zenith.laya_adapter import APPROVED_MODEL_ID
+from zenith.csv_export import export_session_to_csv
+from zenith.decision_viewer import DecisionViewer
+from zenith.game2048_simulator import Deterministic2048Simulator
+from zenith.hash_chain import read_jsonl_records, verify_jsonl_file
+from zenith.laya_adapter import APPROVED_MODEL_ID, LayaAdapter
+from zenith.main import MockSnakeArena, make_mock_decide_fn
+from zenith.pdf_export import generate_session_pdf
+from zenith.runner import ArenaAdapter, DecideFn, SessionResult, SessionRunner
+from zenith.session_logger import SessionLogger
 
 STATIC_DIR = Path(__file__).resolve().parent / "web" / "static"
 
@@ -250,11 +261,9 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 class ZenithRequestHandler(SimpleHTTPRequestHandler):
     """HTTP Request Handler for Team ZENITH console."""
 
-    # Handled by custom router
     server_instance: Optional[ZenithServer] = None
 
     def __init__(self, *args, **kwargs):
-        # We serve static files from STATIC_DIR
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -294,9 +303,9 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
         """Route GET requests to API handlers or static files."""
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        server: Optional[ZenithServer] = getattr(self.server, "zenith_server", None)
 
         if path == "/api/health":
-            server = getattr(self.server, "zenith_server", None)
             if not server:
                 self._send_error_json("Server state unavailable", 500)
                 return
@@ -308,11 +317,195 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/session/current":
-            server = getattr(self.server, "zenith_server", None)
             if not server:
                 self._send_error_json("Server state unavailable", 500)
                 return
             self._send_json(server.get_current_session())
+            return
+
+        if path == "/api/session/events":
+            if not server:
+                self._send_error_json("Server state unavailable", 500)
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            q: queue.Queue = queue.Queue(maxsize=200)
+            server.register_sse_client(q)
+
+            # Send initial sync event
+            init_data = server.get_current_session()
+            sync_payload = json.dumps(init_data)
+            try:
+                self.wfile.write(f"event: session_sync\ndata: {sync_payload}\n\n".encode("utf-8"))
+                self.wfile.flush()
+            except Exception:
+                server.unregister_sse_client(q)
+                return
+
+            try:
+                while True:
+                    try:
+                        event_type, payload = q.get(timeout=10.0)
+                        msg = f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
+                        self.wfile.write(msg.encode("utf-8"))
+                        self.wfile.flush()
+                    except queue.Empty:
+                        self.wfile.write(b": ping\n\n")
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            finally:
+                server.unregister_sse_client(q)
+            return
+
+        if path == "/api/logs/export-csv":
+            query = urllib.parse.parse_qs(parsed.query)
+            session_id = query.get("session_id", [None])[0]
+            if not session_id and server and server._active_session_data:
+                session_id = server._active_session_data.get("session_id")
+            if not session_id:
+                self._send_error_json("Missing session_id parameter", 400)
+                return
+            log_dir = Path(server.log_dir if server else "logs")
+            log_path = log_dir / f"{session_id}.jsonl"
+            if not log_path.exists():
+                self._send_error_json(f"Session log not found: {session_id}", 404)
+                return
+            try:
+                csv_text = export_session_to_csv(log_path)
+            except Exception as exc:
+                self._send_error_json(f"CSV export failed: {exc}", 500)
+                return
+            csv_bytes = csv_text.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.csv"')
+            self.send_header("Content-Length", str(len(csv_bytes)))
+            self.end_headers()
+            self.wfile.write(csv_bytes)
+            return
+
+        if path == "/api/logs/download":
+            query = urllib.parse.parse_qs(parsed.query)
+            session_id = query.get("session_id", [None])[0]
+            if not session_id and server and server._active_session_data:
+                session_id = server._active_session_data.get("session_id")
+            if not session_id:
+                self._send_error_json("Missing session_id parameter", 400)
+                return
+            log_dir = Path(server.log_dir if server else "logs")
+            log_path = log_dir / f"{session_id}.jsonl"
+            if not log_path.exists():
+                self._send_error_json(f"Session log not found: {session_id}", 404)
+                return
+            with open(log_path, "rb") as f:
+                log_bytes = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-jsonlines; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.jsonl"')
+            self.send_header("Content-Length", str(len(log_bytes)))
+            self.end_headers()
+            self.wfile.write(log_bytes)
+            return
+
+        if path == "/api/logs/verify":
+            query = urllib.parse.parse_qs(parsed.query)
+            session_id = query.get("session_id", [None])[0]
+            if not session_id and server and server._active_session_data:
+                session_id = server._active_session_data.get("session_id")
+            if not session_id:
+                self._send_error_json("Missing session_id parameter", 400)
+                return
+            log_dir = Path(server.log_dir if server else "logs")
+            log_path = log_dir / f"{session_id}.jsonl"
+            if not log_path.exists():
+                self._send_error_json(f"Session log not found: {session_id}", 404)
+                return
+            res = verify_jsonl_file(log_path)
+            self._send_json({
+                "session_id": session_id,
+                "is_valid": res.is_valid,
+                "error_message": res.error_message,
+                "record_count": res.record_count,
+                "failing_step": res.error_line_index,
+            })
+            return
+
+        if path == "/api/logs/export-pdf":
+            query = urllib.parse.parse_qs(parsed.query)
+            session_id = query.get("session_id", [None])[0]
+            if not session_id and server and server._active_session_data:
+                session_id = server._active_session_data.get("session_id")
+            if not session_id:
+                self._send_error_json("Missing session_id parameter", 400)
+                return
+            log_dir = Path(server.log_dir if server else "logs")
+            log_path = log_dir / f"{session_id}.jsonl"
+            if not log_path.exists():
+                self._send_error_json(f"Session log not found: {session_id}", 404)
+                return
+            try:
+                pdf_bytes = generate_session_pdf(log_path)
+            except Exception as exc:
+                self._send_error_json(f"PDF export failed: {exc}", 500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.pdf"')
+            self.send_header("Content-Length", str(len(pdf_bytes)))
+            self.end_headers()
+            self.wfile.write(pdf_bytes)
+            return
+
+        if path == "/api/sessions":
+            log_dir = Path(server.log_dir if server else "logs")
+            sessions = []
+            if log_dir.exists():
+                for p in sorted(log_dir.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True):
+                    s_id = p.stem
+                    # Quick metadata check
+                    mtime_iso = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    game = "snake" if "snake" in s_id.lower() else ("2048" if "2048" in s_id.lower() else "unknown")
+                    mode = "live" if s_id.lower().startswith("live") else "mock"
+                    final_path = log_dir / f"{s_id}_final.json"
+                    sessions.append({
+                        "session_id": s_id,
+                        "game": game,
+                        "mode": mode,
+                        "file_size": p.stat().st_size,
+                        "modified_at": mtime_iso,
+                        "has_final": final_path.exists(),
+                    })
+            self._send_json({"sessions": sessions[:100]})
+            return
+
+        if path == "/api/logs/session":
+            query = urllib.parse.parse_qs(parsed.query)
+            session_id = query.get("session_id", [None])[0]
+            if not session_id and server and server._active_session_data:
+                session_id = server._active_session_data.get("session_id")
+            if not session_id:
+                self._send_error_json("Missing session_id parameter", 400)
+                return
+            log_dir = Path(server.log_dir if server else "logs")
+            log_path = log_dir / f"{session_id}.jsonl"
+            if not log_path.exists():
+                self._send_error_json(f"Session log not found: {session_id}", 404)
+                return
+            with open(log_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            records = read_jsonl_records(lines)
+            self._send_json({
+                "session_id": session_id,
+                "count": len(records),
+                "records": records,
+            })
             return
 
         # Map root URL to index.html
@@ -327,7 +520,7 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
         """Route POST requests to API control endpoints."""
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        server = getattr(self.server, "zenith_server", None)
+        server: Optional[ZenithServer] = getattr(self.server, "zenith_server", None)
         if not server:
             self._send_error_json("Server state unavailable", 500)
             return
@@ -365,7 +558,7 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
 
 
 class ZenithServer:
-    """Manages the backend HTTP server, health checks, and session lifecycle."""
+    """Manages the backend HTTP server, health checks, session lifecycle, and SSE broadcasting."""
 
     def __init__(
         self,
@@ -373,6 +566,7 @@ class ZenithServer:
         port: int = 8080,
         base_url: str = ArenaClient.DEFAULT_BASE_URL,
         mock_model: bool = False,
+        log_dir: str = "logs",
         arena_check_fn: Optional[Callable[[], Tuple[bool, int, Optional[str]]]] = None,
         laya_check_fn: Optional[Callable[[], Tuple[bool, int, Optional[str]]]] = None,
     ) -> None:
@@ -380,6 +574,7 @@ class ZenithServer:
         self.port = port
         self.base_url = base_url
         self.mock_model = mock_model
+        self.log_dir = log_dir
 
         self.health_checker = HealthChecker(
             base_url=base_url,
@@ -390,8 +585,16 @@ class ZenithServer:
 
         self._httpd: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
+        self._session_thread: Optional[threading.Thread] = None
+
         self._active_session_data: Optional[Dict[str, Any]] = None
+        self._active_runner: Optional[SessionRunner] = None
+        self._latest_step_data: Optional[Dict[str, Any]] = None
+        self._session_result: Optional[Dict[str, Any]] = None
+
         self._session_lock = threading.RLock()
+        self._sse_clients: List[queue.Queue] = []
+        self._sse_lock = threading.Lock()
 
     @property
     def server_port(self) -> int:
@@ -404,21 +607,155 @@ class ZenithServer:
         """Return full base HTTP URL of the server."""
         return f"http://{self.host}:{self.server_port}"
 
+    def register_sse_client(self, q: queue.Queue) -> None:
+        """Register a new client queue for SSE broadcasting."""
+        with self._sse_lock:
+            self._sse_clients.append(q)
+
+    def unregister_sse_client(self, q: queue.Queue) -> None:
+        """Unregister a client queue on disconnect."""
+        with self._sse_lock:
+            if q in self._sse_clients:
+                self._sse_clients.remove(q)
+
+    def _broadcast_event(self, event_type: str, data: Any) -> None:
+        """Push an event to all connected SSE clients."""
+        with self._sse_lock:
+            dead_clients = []
+            for q in self._sse_clients:
+                try:
+                    q.put_nowait((event_type, data))
+                except queue.Full:
+                    dead_clients.append(q)
+            for d in dead_clients:
+                if d in self._sse_clients:
+                    self._sse_clients.remove(d)
+
     def is_session_active(self) -> bool:
         """Check whether a session is currently running."""
         with self._session_lock:
-            return self._active_session_data is not None and self._active_session_data.get("status") == "ACTIVE"
+            return (
+                self._active_session_data is not None
+                and self._active_session_data.get("status") == "ACTIVE"
+            )
 
     def get_current_session(self) -> Dict[str, Any]:
-        """Return current or last active session snapshot."""
+        """Return current or last active session snapshot and latest move."""
         with self._session_lock:
             return {
-                "session": self._active_session_data,
                 "active": self.is_session_active(),
+                "session": self._active_session_data,
+                "latest_move": self._latest_step_data,
+                "summary": self._session_result,
             }
 
+    def _on_runner_step(self, step_data: Dict[str, Any]) -> None:
+        """Callback invoked by SessionRunner on every move."""
+        with self._session_lock:
+            self._latest_step_data = step_data
+        self._broadcast_event("move", step_data)
+
+    def _on_runner_complete(self, res: SessionResult) -> None:
+        """Callback invoked by SessionRunner upon completion."""
+        with self._session_lock:
+            if self._active_session_data:
+                self._active_session_data["status"] = "FINISHED" if not res.error else "FAILED"
+                self._active_session_data["ended_at"] = _utc_now_iso()
+                self._active_session_data["final_score"] = res.final_score
+                self._active_session_data["won"] = res.won
+                self._active_session_data["hash_chain_valid"] = res.hash_chain_valid
+                self._active_session_data["total_moves"] = res.total_moves
+                self._active_session_data["applied_moves"] = res.applied_moves
+                self._active_session_data["rejected_moves"] = res.rejected_moves
+                self._active_session_data["fallback_moves"] = res.fallback_moves
+                self._active_session_data["log_path"] = res.log_path
+                self._active_session_data["error"] = res.error
+            self._session_result = {
+                "final_score": res.final_score,
+                "won": res.won,
+                "hash_chain_valid": res.hash_chain_valid,
+                "total_time_ms": res.total_time_ms,
+                "log_path": res.log_path,
+                "error": res.error,
+            }
+        self._broadcast_event("session_finished", self._active_session_data or {})
+
+    def _run_session_worker(
+        self,
+        session_id: str,
+        game: str,
+        mode: str,
+        mock_model: bool,
+        prompt_version: str,
+        max_moves: Optional[int],
+    ) -> None:
+        """Background thread executing the session runner loop."""
+        try:
+            # Step 1: Configure arena adapter
+            arena: ArenaAdapter
+            if mode == "live":
+                client = ArenaClient(
+                    base_url=self.base_url,
+                    timeout=10.0,
+                    default_agent_name="ZENITH",
+                )
+                session_resp = client.create_session(game=game, agent_name="ZENITH")
+                arena = client
+            else:
+                if game == "snake":
+                    mock_arena = MockSnakeArena(session_id=session_id, max_moves=max_moves or 10)
+                else:
+                    mock_arena = Deterministic2048Simulator(max_moves=max_moves or 100, session_id_prefix=session_id)
+                session_resp = mock_arena.create_session(game=game, agent_name="ZENITH")
+                arena = mock_arena
+
+            # Step 2: Configure decide function
+            if mock_model:
+                decide_fn = make_mock_decide_fn()
+            else:
+                adapter_kwargs = {"model_id": APPROVED_MODEL_ID}
+                if prompt_version != "v1":
+                    adapter_kwargs["prompt_version"] = prompt_version
+                adapter = LayaAdapter(**adapter_kwargs)
+                decide_fn = adapter.decide
+
+            # Step 3: Configure logger and viewer
+            logger = SessionLogger(session_id=session_id, game=game, log_dir=self.log_dir)
+            viewer = DecisionViewer(
+                game=game,
+                session_id=session_id,
+                mock_mode=(mode != "live" or mock_model),
+                log_path=str(logger.log_path),
+            )
+
+            # Step 4: Configure runner
+            runner = SessionRunner(
+                arena=arena,
+                decide_fn=decide_fn,
+                logger=logger,
+                viewer=viewer,
+                on_step=self._on_runner_step,
+                on_complete=self._on_runner_complete,
+            )
+
+            with self._session_lock:
+                self._active_runner = runner
+
+            # Step 5: Execute runner loop
+            runner.run(initial_session_data=session_resp)
+
+        except Exception as exc:
+            with self._session_lock:
+                if self._active_session_data:
+                    self._active_session_data["status"] = "ERROR"
+                    self._active_session_data["error"] = str(exc)
+            self._broadcast_event("session_error", {"session_id": session_id, "error": str(exc)})
+        finally:
+            with self._session_lock:
+                self._active_runner = None
+
     def start_session(self, config: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
-        """Initiate a session if the decision layer is READY."""
+        """Initiate a session in a background thread if the decision layer is READY."""
         with self._session_lock:
             if self.is_session_active():
                 return {"error": "A session is already active."}, 409
@@ -430,8 +767,21 @@ class ZenithServer:
                     "health": summary,
                 }, 400
 
-            game = config.get("game", "snake")
-            mode = config.get("mode", "dry-run")
+            game = str(config.get("game", "snake")).strip().lower()
+            if game not in ("snake", "2048"):
+                return {"error": f"Unsupported game '{game}'. Valid choices: snake, 2048."}, 400
+
+            mode = str(config.get("mode", "dry-run")).strip().lower()
+            mock_model = bool(config.get("mock_model", self.mock_model))
+            prompt_version = str(config.get("prompt_version", "v1"))
+            max_moves_raw = config.get("max_moves")
+            max_moves: Optional[int] = None
+            if max_moves_raw is not None:
+                try:
+                    max_moves = int(max_moves_raw)
+                except (ValueError, TypeError):
+                    max_moves = None
+
             session_id = f"{'live' if mode == 'live' else 'mock'}-{game}-{int(time.time() * 1000)}"
 
             self._active_session_data = {
@@ -441,8 +791,21 @@ class ZenithServer:
                 "status": "ACTIVE",
                 "started_at": _utc_now_iso(),
                 "agent_name": "ZENITH",
-                "mock_mode": (mode != "live") or self.mock_model,
+                "mock_mode": (mode != "live") or mock_model,
+                "prompt_version": prompt_version,
             }
+            self._latest_step_data = None
+            self._session_result = None
+
+            # Spawn runner thread
+            self._session_thread = threading.Thread(
+                target=self._run_session_worker,
+                args=(session_id, game, mode, mock_model, prompt_version, max_moves),
+                daemon=True,
+            )
+            self._session_thread.start()
+
+            self._broadcast_event("session_started", self._active_session_data)
 
             return {
                 "message": "Session initialized.",
@@ -452,13 +815,17 @@ class ZenithServer:
     def stop_session(self) -> Tuple[Dict[str, Any], int]:
         """Cleanly halt the active session."""
         with self._session_lock:
-            if not self._active_session_data or self._active_session_data.get("status") != "ACTIVE":
+            if not self.is_session_active():
                 return {"message": "No active session to stop."}, 200
 
-            self._active_session_data["status"] = "FINISHED"
-            self._active_session_data["ended_at"] = _utc_now_iso()
+            if self._active_runner:
+                self._active_runner.stop()
+
+            if self._active_session_data:
+                self._active_session_data["status"] = "STOPPING"
+
             return {
-                "message": "Session stopped.",
+                "message": "Session stop signal sent.",
                 "session": self._active_session_data,
             }, 200
 
@@ -466,7 +833,6 @@ class ZenithServer:
         """Start the HTTP server."""
         handler_class = ZenithRequestHandler
         self._httpd = ThreadingHTTPServer((self.host, self.port), handler_class)
-        # Bind back-reference so handler can reach server methods
         self._httpd.zenith_server = self  # type: ignore[attr-defined]
 
         if background:
@@ -482,6 +848,9 @@ class ZenithServer:
 
     def stop(self) -> None:
         """Stop the HTTP server and release port."""
+        with self._session_lock:
+            if self._active_runner:
+                self._active_runner.stop()
         if self._httpd:
             self._httpd.shutdown()
             self._httpd.server_close()
@@ -489,3 +858,6 @@ class ZenithServer:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
             self._thread = None
+        if self._session_thread and self._session_thread.is_alive():
+            self._session_thread.join(timeout=2.0)
+            self._session_thread = None
