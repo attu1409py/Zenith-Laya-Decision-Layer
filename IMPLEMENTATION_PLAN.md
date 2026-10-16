@@ -46,7 +46,7 @@ The new repo should not copy the custom game engines just to satisfy the competi
 | M1 | Confirm Laya runtime/API | Strong reasoning model if schema/docs are ambiguous | Official runtime and response schema documented; safe test decision confirmed; credentials kept secret | Blocked until source info provided |
 | M2 (Task 02) | Arena API client | Mid-tier coding model; use stronger model for ambiguous parsing/error handling | Create session, get state, send action, capture final response; mocked unit tests pass (18/18 tests pass) | Completed (2026-10-16) |
 | M3 (Task 03) | Decision validation and logger | Strong reasoning/coding model | Probability/action/confidence validation passes tests; JSONL schema complete; SHA-256 chain integrated | Completed (2026-10-16) |
-| M4 (Task 04) | Visible decision viewer + mock runner | Mid/high coding model | Viewer stays visible; runner loop tested with mocks; no unverified live submission | Next recommended task |
+| M4 (Task 04) | Visible decision viewer + mock runner | Mid/high coding model | Viewer stays visible; runner loop tested with mocks; no unverified live submission (22+14 = 36 new tests, 116 total) | Completed (2026-10-16) |
 | M5 | Verified Snake run | Strong reasoning for failure analysis | Final response matches last log record; hash chain intact; fallback <=10%; score >=600; session qualifies as verified | Not started |
 | M6 | 2048 client and prompt | Mid/high coding model | Stage unlock confirmed; 2048 runs logged and independently verified | Locked until M5 success |
 | M7 | Three best 2048 runs | Strong reasoning for log/scoring verification | Three qualifying run logs preserved; median points computed per guide; qualifying 512 tile hit if seeking optional Stage 3 | Locked until M6 is ready |
