@@ -256,6 +256,33 @@ class SessionLogger:
 
         return target_file
 
+    def save_metadata(
+        self,
+        metadata: Mapping[str, Any],
+        filename: Optional[str] = None,
+    ) -> Path:
+        """Persist session attribution metadata and creation response locally.
+
+        Args:
+            metadata: Dictionary containing session creation metadata, agent_name,
+                model_id, prompt_version, initial_response, etc.
+            filename: Optional custom filename (defaults to '{session_id}_meta.json').
+
+        Returns:
+            The Path to the saved metadata file.
+        """
+        if not isinstance(metadata, (dict, Mapping)):
+            raise SessionLoggerError(
+                f"metadata must be a dictionary, got {type(metadata).__name__}."
+            )
+
+        target_file = self.log_dir / (filename or f"{self.session_id}_meta.json")
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(dict(metadata), f, indent=2, ensure_ascii=False)
+            f.flush()
+
+        return target_file
+
     def verify_log(self) -> VerificationResult:
         """Verify the cryptographic hash-chain integrity of this session's log file."""
         return verify_jsonl_file(self.log_path)

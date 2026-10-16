@@ -340,6 +340,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=5,
         help="Stop after this many consecutive errors (default: 5).",
     )
+    parser.add_argument(
+        "--prompt-version",
+        default="v1",
+        choices=["v1", "v2"],
+        help="Prompt strategy version ('v1' baseline, 'v2' revised; default: 'v1').",
+    )
     return parser
 
 
@@ -383,7 +389,10 @@ def run_cli(
         stdout.write(f"Initializing Laya decision adapter with checkpoint '{APPROVED_MODEL_ID}'...\n")
         stdout.flush()
         try:
-            adapter = LayaAdapter(model_id=APPROVED_MODEL_ID)
+            adapter_kwargs = {"model_id": APPROVED_MODEL_ID}
+            if hasattr(args, "prompt_version") and args.prompt_version != "v1":
+                adapter_kwargs["prompt_version"] = args.prompt_version
+            adapter = LayaAdapter(**adapter_kwargs)
             decide_fn = adapter.decide
         except Exception as exc:
             stderr.write(f"Failed to initialize Laya adapter: {exc}\n")
@@ -434,6 +443,21 @@ def run_cli(
     # ── Step 3: Configure Logger, Viewer, and Runner ──
     log_dir = Path(args.log_dir)
     logger = SessionLogger(session_id=session_id, game=game, log_dir=log_dir)
+
+    # Preserve session creation response and attribution metadata locally
+    try:
+        logger.save_metadata({
+            "session_id": session_id,
+            "game": game,
+            "agent_name": args.agent_name,
+            "model_id": model_display,
+            "prompt_version": getattr(args, "prompt_version", "v1"),
+            "mode": "live" if is_live else "dry_run",
+            "initial_response": session_resp,
+        })
+    except Exception:
+        pass
+
     viewer = DecisionViewer(
         game=game,
         session_id=session_id,

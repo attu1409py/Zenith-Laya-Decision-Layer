@@ -115,6 +115,7 @@ class SessionRunner:
         fallback_tracker: Optional[FallbackTracker] = None,
         *,
         max_consecutive_errors: int = 5,
+        max_consecutive_rejections: int = 10,
     ):
         """Initialize the session runner.
 
@@ -125,6 +126,7 @@ class SessionRunner:
             viewer: DecisionViewer for terminal display.
             fallback_tracker: FallbackTracker instance (created if None).
             max_consecutive_errors: Stop after this many consecutive errors.
+            max_consecutive_rejections: Stop after this many consecutive rejected moves.
         """
         self._arena = arena
         self._decide_fn = decide_fn
@@ -132,6 +134,7 @@ class SessionRunner:
         self._viewer = viewer
         self._fallback = fallback_tracker or FallbackTracker()
         self._max_consecutive_errors = max_consecutive_errors
+        self._max_consecutive_rejections = max_consecutive_rejections
 
     def run(self, initial_session_data: Optional[Dict[str, Any]] = None) -> SessionResult:
         """Execute the game session loop and return the result.
@@ -153,6 +156,7 @@ class SessionRunner:
 
         step = 0          # accepted-step counter
         consecutive_errors = 0
+        consecutive_rejections = 0
         done = False
 
         # Get initial state
@@ -232,8 +236,16 @@ class SessionRunner:
             if move_result == "applied":
                 step += 1
                 result.applied_moves += 1
+                consecutive_rejections = 0
             else:
                 result.rejected_moves += 1
+                consecutive_rejections += 1
+                if consecutive_rejections >= self._max_consecutive_rejections:
+                    result.error = (
+                        f"Too many consecutive rejected moves "
+                        f"({consecutive_rejections}): session stopped to avoid infinite loop."
+                    )
+                    break
 
             result.total_moves += 1
             turn_ms = turn_watch.elapsed_ms()

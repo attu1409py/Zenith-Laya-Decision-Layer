@@ -50,8 +50,10 @@ The new repo should not copy the custom game engines just to satisfy the competi
 | M3 (Task 03) | Decision validation and logger | Strong reasoning/coding model | Probability/action/confidence validation passes tests; JSONL schema complete; SHA-256 chain integrated | Completed (2026-10-16) |
 | M4 (Task 04) | Visible decision viewer + mock runner | Mid/high coding model | Viewer stays visible; runner loop tested with mocks; no unverified live submission (22+14 = 36 new tests, 116 total) | Completed (2026-10-16) |
 | Task 06 | Executable CLI & end-to-end runner | Mid/high coding model | zenith/main.py, run_session.py, MockSnakeArena, live confirmation guard, 15 tests in test_cli.py (156 total tests) | Completed (2026-10-16) |
-| M5 | Verified Snake run | Strong reasoning for failure analysis | Final response matches last log record; hash chain intact; fallback <=10%; score >=600; session qualifies as verified | Ready (Awaiting operator auth) |
-| M6 | 2048 client and prompt | Mid/high coding model | Stage unlock confirmed; 2048 runs logged and independently verified | Locked until M5 success |
+| Task 06B | Local Laya Snake benchmark & prompt optimization | Strong coding model | DeterministicSnakeSimulator, benchmark suite, v2 prompt/criteria optimization (36x score improvement, 100% runs >= 600 pts, 179 total tests pass) | Completed (2026-10-17) |
+| Task 07A | Run history aggregator & attribution audit | Strong coding/reasoning model | Consolidated run_history.jsonl, CSV, benchmark_report.md; verified 12/12 hash chains; audited official run f240cb86...; leaderboard FIFO limit 20 findings; 18 new tests (197 total tests pass) | Completed (2026-10-17) |
+| M5 | Verified Snake run | Strong reasoning for failure analysis | Final response matches last log record; hash chain intact; fallback <=10%; score >=600; session qualifies as verified | Completed (f240cb86: 1000 pts, won, 152 steps, hash chain valid) |
+| M6 | 2048 client and prompt | Mid/high coding model | Stage unlock confirmed; 2048 runs logged and independently verified | Ready for implementation |
 | M7 | Three best 2048 runs | Strong reasoning for log/scoring verification | Three qualifying run logs preserved; median points computed per guide; qualifying 512 tile hit if seeking optional Stage 3 | Locked until M6 is ready |
 | M8 | Optional Doom-style stage | Decide only after organizer confirms environment | Exact official environment/interface known; earlier run evidence retained | Optional / unknown |
 

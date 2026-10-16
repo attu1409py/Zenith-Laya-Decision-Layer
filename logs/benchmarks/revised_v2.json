@@ -1,0 +1,257 @@
+[
+  {
+    "seed": 42,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "score": 1000,
+    "food_eaten": 15,
+    "accepted_moves": 105,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": true,
+    "termination_reason": "target_food_reached",
+    "avg_inference_ms": 54.37,
+    "min_inference_ms": 45,
+    "max_inference_ms": 590,
+    "total_time_s": 6.19,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v2-42.jsonl",
+    "failure_details": null
+  },
+  {
+    "seed": 100,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "score": 1000,
+    "food_eaten": 15,
+    "accepted_moves": 151,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": true,
+    "termination_reason": "target_food_reached",
+    "avg_inference_ms": 49.15,
+    "min_inference_ms": 45,
+    "max_inference_ms": 80,
+    "total_time_s": 7.64,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v2-100.jsonl",
+    "failure_details": null
+  },
+  {
+    "seed": 2026,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "score": 1000,
+    "food_eaten": 15,
+    "accepted_moves": 113,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": true,
+    "termination_reason": "target_food_reached",
+    "avg_inference_ms": 49.22,
+    "min_inference_ms": 45,
+    "max_inference_ms": 67,
+    "total_time_s": 5.74,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v2-2026.jsonl",
+    "failure_details": null
+  },
+  {
+    "seed": 7,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "score": 660,
+    "food_eaten": 11,
+    "accepted_moves": 114,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "self_collision",
+    "avg_inference_ms": 49.65,
+    "min_inference_ms": 45,
+    "max_inference_ms": 93,
+    "total_time_s": 5.84,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v2-7.jsonl",
+    "failure_details": {
+      "termination_reason": "self_collision",
+      "last_step": 114,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "The snake head is at (8, 1) on a 12x12 grid. Food is at (3, 2). Moving up or down or left or right causes fatal collision or illegal reversal. Moving none stays safely on the board. Which safe direction should the snake choose to avoid collision and stay alive?"
+        ],
+        "probabilities": {
+          "up": 0.4346,
+          "down": 0.2094,
+          "left": 0.1853,
+          "right": 0.1707
+        },
+        "chosen": "up",
+        "confidence": 0.4346,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 8,
+          "y": 1
+        },
+        {
+          "x": 7,
+          "y": 1
+        },
+        {
+          "x": 7,
+          "y": 2
+        },
+        {
+          "x": 8,
+          "y": 2
+        },
+        {
+          "x": 9,
+          "y": 2
+        },
+        {
+          "x": 9,
+          "y": 1
+        },
+        {
+          "x": 9,
+          "y": 0
+        },
+        {
+          "x": 8,
+          "y": 0
+        },
+        {
+          "x": 7,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        },
+        {
+          "x": 6,
+          "y": 2
+        },
+        {
+          "x": 6,
+          "y": 3
+        },
+        {
+          "x": 6,
+          "y": 4
+        }
+      ],
+      "food_final": {
+        "x": 3,
+        "y": 2
+      }
+    }
+  },
+  {
+    "seed": 13,
+    "prompt_version": "v2",
+    "model_id": "convaiinnovations/laya",
+    "score": 660,
+    "food_eaten": 11,
+    "accepted_moves": 64,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "self_collision",
+    "avg_inference_ms": 48.33,
+    "min_inference_ms": 45,
+    "max_inference_ms": 65,
+    "total_time_s": 3.2,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-v2-13.jsonl",
+    "failure_details": {
+      "termination_reason": "self_collision",
+      "last_step": 64,
+      "last_action": "up",
+      "last_decision": {
+        "questions": [
+          "The snake head is at (5, 6) on a 12x12 grid. Food is at (9, 0). Moving up or down or left or right causes fatal collision or illegal reversal. Moving none stays safely on the board. Which safe direction should the snake choose to avoid collision and stay alive?"
+        ],
+        "probabilities": {
+          "up": 0.334,
+          "down": 0.2366,
+          "left": 0.2091,
+          "right": 0.2203
+        },
+        "chosen": "up",
+        "confidence": 0.334,
+        "source": "laya"
+      },
+      "snake_final": [
+        {
+          "x": 5,
+          "y": 6
+        },
+        {
+          "x": 4,
+          "y": 6
+        },
+        {
+          "x": 4,
+          "y": 7
+        },
+        {
+          "x": 5,
+          "y": 7
+        },
+        {
+          "x": 6,
+          "y": 7
+        },
+        {
+          "x": 6,
+          "y": 6
+        },
+        {
+          "x": 6,
+          "y": 5
+        },
+        {
+          "x": 5,
+          "y": 5
+        },
+        {
+          "x": 4,
+          "y": 5
+        },
+        {
+          "x": 4,
+          "y": 4
+        },
+        {
+          "x": 4,
+          "y": 3
+        },
+        {
+          "x": 4,
+          "y": 2
+        },
+        {
+          "x": 4,
+          "y": 1
+        },
+        {
+          "x": 5,
+          "y": 1
+        }
+      ],
+      "food_final": {
+        "x": 9,
+        "y": 0
+      }
+    }
+  }
+]

@@ -64,11 +64,15 @@ def _parse_coord(pt: Any) -> Optional[Tuple[int, int]]:
     return None
 
 
-def format_snake_state(state: Mapping[str, Any]) -> Tuple[Dict[str, Any], str]:
+def format_snake_state(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Tuple[Dict[str, Any], str]:
     """Format an Arena Snake state mapping into a prompt state and question instruction.
 
     Args:
         state: Raw state dictionary returned by TopGameAI Arena API.
+        prompt_version: Prompt strategy version ('v1' baseline or 'v2' revised).
 
     Returns:
         A tuple of (prompt_state_dict, question_instruction_text).
@@ -148,24 +152,147 @@ def format_snake_state(state: Mapping[str, Any]) -> Tuple[Dict[str, Any], str]:
         "food_eaten": food_eaten,
     }
 
-    question_text = (
-        f"In this Snake game on a {width}x{height} board (columns x: 0-{width - 1}, rows y: 0-{height - 1}), "
-        f"the snake head is at {list(head)}, body length is {len(snake_cells) if snake_cells else 1}, "
-        f"current direction is {direction}, and food is at {list(food)}. "
-        "Which direction (up, down, left, right) should the snake move next to avoid collisions "
-        "and advance toward the food?"
-    )
+    if prompt_version == "v2":
+        hx, hy = head
+        fx, fy = food
+        offsets = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0),
+        }
+        body_coords = set(body)
+        neck = body[0] if body else None
+        dist_cur = abs(hx - fx) + abs(hy - fy)
+
+        lethal: List[str] = []
+        closer: List[str] = []
+        other_safe: List[str] = []
+
+        for d in VALID_DIRECTIONS:
+            dx, dy = offsets[d]
+            nx, ny = hx + dx, hy + dy
+            if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                lethal.append(d)
+            elif neck and (nx, ny) == neck:
+                lethal.append(d)
+            elif (nx, ny) in body_coords:
+                lethal.append(d)
+            else:
+                d_new = abs(nx - fx) + abs(ny - fy)
+                if d_new < dist_cur:
+                    closer.append(d)
+                else:
+                    other_safe.append(d)
+
+        parts = [f"The snake head is at ({hx}, {hy}) on a {width}x{height} grid. Food is at ({fx}, {fy})."]
+        if lethal:
+            lethal_str = " or ".join(lethal)
+            parts.append(f"Moving {lethal_str} causes fatal collision or illegal reversal.")
+        if closer:
+            closer_str = " or ".join(closer)
+            parts.append(f"Moving {closer_str} safely advances toward the food.")
+            parts.append("Which safe direction should the snake choose to advance toward the food?")
+        else:
+            safe_str = " or ".join(other_safe) if other_safe else "none"
+            parts.append(f"Moving {safe_str} stays safely on the board.")
+            parts.append("Which safe direction should the snake choose to avoid collision and stay alive?")
+        question_text = " ".join(parts)
+
+        prompt_state = {
+            "game": "snake",
+            "grid_size": f"{width}x{height}",
+            "head": list(head),
+            "food": list(food),
+            "food_eaten": food_eaten,
+            "safe_moves": closer + other_safe,
+        }
+    else:
+        question_text = (
+            f"In this Snake game on a {width}x{height} board (columns x: 0-{width - 1}, rows y: 0-{height - 1}), "
+            f"the snake head is at {list(head)}, body length is {len(snake_cells) if snake_cells else 1}, "
+            f"current direction is {direction}, and food is at {list(food)}. "
+            "Which direction (up, down, left, right) should the snake move next to avoid collisions "
+            "and advance toward the food?"
+        )
 
     return prompt_state, question_text
 
 
-def build_laya_questions(question_text: str) -> Dict[str, Dict[str, Any]]:
+def build_snake_criteria(
+    state: Mapping[str, Any],
+    prompt_version: str = "v1",
+) -> Dict[str, str]:
+    """Build the criteria dictionary for Laya choice options.
+
+    For 'v1', returns the static default criteria.
+    For 'v2', generates context-aware criteria detailing survival outcomes
+    and relative food proximity for each candidate direction.
+    """
+    if prompt_version != "v2":
+        return dict(CRITERIA)
+
+    if not isinstance(state, (dict, Mapping)):
+        state = {}
+
+    width = int(state.get("width", 12)) if state.get("width") is not None else 12
+    height = int(state.get("height", 12)) if state.get("height") is not None else 12
+
+    raw_snake = state.get("snake")
+    snake_cells: List[Tuple[int, int]] = []
+    if isinstance(raw_snake, list):
+        for s in raw_snake:
+            parsed = _parse_coord(s)
+            if parsed is not None:
+                snake_cells.append(parsed)
+
+    head = snake_cells[0] if snake_cells else (width // 2, height // 2)
+    body = snake_cells[1:] if len(snake_cells) > 1 else []
+    raw_food = state.get("food")
+    food = _parse_coord(raw_food) or (0, 0)
+
+    hx, hy = head
+    fx, fy = food
+    offsets = {
+        "up": (0, -1),
+        "down": (0, 1),
+        "left": (-1, 0),
+        "right": (1, 0),
+    }
+    body_coords = set(body)
+    neck = body[0] if body else None
+    dist_cur = abs(hx - fx) + abs(hy - fy)
+
+    criteria: Dict[str, str] = {}
+    for d in VALID_DIRECTIONS:
+        dx, dy = offsets[d]
+        nx, ny = hx + dx, hy + dy
+        if nx < 0 or nx >= width or ny < 0 or ny >= height:
+            criteria[d] = "Do not choose: deadly collision into wall"
+        elif neck and (nx, ny) == neck:
+            criteria[d] = "Do not choose: forbidden reversal into snake body"
+        elif (nx, ny) in body_coords:
+            criteria[d] = "Do not choose: deadly collision into snake body"
+        else:
+            d_new = abs(nx - fx) + abs(ny - fy)
+            if d_new < dist_cur:
+                criteria[d] = "Best move: advances toward the food, safe from collision"
+            else:
+                criteria[d] = "Safe move: safely avoids collision and stays on the board"
+
+    return criteria
+
+
+def build_laya_questions(
+    question_text: str,
+    criteria: Optional[Dict[str, str]] = None,
+) -> Dict[str, Dict[str, Any]]:
     """Build the typed choice question dictionary required by Laya SDK."""
     return {
         QUESTION_KEY: {
             "type": "choice",
             "instructions": question_text,
-            "criteria": dict(CRITERIA),
+            "criteria": dict(criteria) if criteria is not None else dict(CRITERIA),
         }
     }
 
@@ -309,6 +436,7 @@ class LayaAdapter:
         agent: Optional[Any] = None,
         model_id: str = APPROVED_MODEL_ID,
         device: Optional[str] = None,
+        prompt_version: str = "v1",
     ) -> None:
         """Initialize LayaAdapter.
 
@@ -317,9 +445,11 @@ class LayaAdapter:
                 convaiinnovations/laya will be loaded via laya.load().
             model_id: Checkpoint identifier (must be convaiinnovations/laya).
             device: Optional runtime device override ('cuda', 'cpu', etc.).
+            prompt_version: Prompt strategy version ('v1' or 'v2').
         """
         self.model_id = model_id
         self.device = device
+        self.prompt_version = prompt_version
         self.last_metadata: Optional[Dict[str, Any]] = None
 
         if agent is not None:
@@ -367,8 +497,9 @@ class LayaAdapter:
             )
 
         # 1. Format state and question instructions
-        prompt_state, question_text = format_snake_state(state)
-        questions = build_laya_questions(question_text)
+        prompt_state, question_text = format_snake_state(state, prompt_version=self.prompt_version)
+        criteria = build_snake_criteria(state, prompt_version=self.prompt_version)
+        questions = build_laya_questions(question_text, criteria=criteria)
 
         # 2. Execute genuine inference
         t0 = time.perf_counter()

@@ -20,6 +20,7 @@ from zenith.laya_adapter import (
     LayaResponseContractError,
     _parse_coord,
     build_laya_questions,
+    build_snake_criteria,
     extract_and_validate_choice_response,
     format_snake_state,
 )
@@ -512,6 +513,47 @@ class TestLayaAdapterRunnerIntegration(unittest.TestCase):
         # Verify agent was called 3 times
         self.assertEqual(agent.call_count, 3)
         self.assertEqual(arena_client.actions_received, ["right", "right", "right"])
+
+
+class TestBuildSnakeCriteriaAndV2(unittest.TestCase):
+    """Tests for build_snake_criteria and prompt_version='v2'."""
+
+    def test_build_snake_criteria_v1_returns_default(self):
+        state = {"snake": [{"x": 6, "y": 6}], "food": {"x": 6, "y": 3}}
+        crit = build_snake_criteria(state, prompt_version="v1")
+        self.assertEqual(crit, CRITERIA)
+
+    def test_build_snake_criteria_v2_identifies_hazards_and_goals(self):
+        # Head at (6, 0), top row. Moving up is out of bounds (y=-1).
+        # Body at (6, 1) and (6, 2). Moving down hits neck at (6, 1).
+        # Food at (4, 2). Moving left reaches (5, 0) which is closer to food.
+        # Moving right reaches (7, 0) which is further from food.
+        state = {
+            "width": 12,
+            "height": 12,
+            "snake": [{"x": 6, "y": 0}, {"x": 6, "y": 1}, {"x": 6, "y": 2}],
+            "food": {"x": 4, "y": 2},
+            "direction": "up",
+        }
+        crit = build_snake_criteria(state, prompt_version="v2")
+        self.assertIn("deadly collision into wall", crit["up"])
+        self.assertIn("forbidden reversal into snake body", crit["down"])
+        self.assertIn("advances toward the food", crit["left"])
+        self.assertIn("safely avoids collision and stays on the board", crit["right"])
+
+    def test_format_snake_state_v2_synthesizes_hazards(self):
+        state = {
+            "width": 12,
+            "height": 12,
+            "snake": [{"x": 6, "y": 0}, {"x": 6, "y": 1}, {"x": 6, "y": 2}],
+            "food": {"x": 4, "y": 2},
+            "direction": "up",
+        }
+        p_state, q_text = format_snake_state(state, prompt_version="v2")
+        self.assertIn("Moving up or down causes fatal collision or illegal reversal.", q_text)
+        self.assertIn("Moving left safely advances toward the food.", q_text)
+        self.assertIn("left", p_state["safe_moves"])
+        self.assertIn("right", p_state["safe_moves"])
 
 
 if __name__ == "__main__":

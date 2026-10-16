@@ -257,6 +257,149 @@ class TestCliExecution(unittest.TestCase):
         self.assertIn("live-session-123", out)
         self.assertIn("VERIFIED VALID", out)
 
+    def test_cli_explicit_agent_name_zenith_passed_to_create_session(self):
+        """CLI with explicit --agent-name ZENITH must pass agent_name='ZENITH' to create_session."""
+        mock_initial = {
+            "session_id": "live-zenith-1",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 6}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": False,
+            "score": 0,
+        }
+        mock_move_resp = {
+            "session_id": "live-zenith-1",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 5}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": True,
+            "score": 100,
+            "won": True,
+            "result": "applied",
+        }
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with patch.object(ArenaClient, "create_session", return_value=mock_initial) as mock_create, \
+             patch.object(ArenaClient, "submit_action", return_value=mock_move_resp) as mock_submit:
+            code = run_cli(
+                ["--live", "--mock-model", "--agent-name", "ZENITH", "--log-dir", self._tmp_dir],
+                input_fn=lambda _: "YES",
+                stdout=stdout,
+                stderr=stderr,
+            )
+            mock_create.assert_called_once_with(game="snake", agent_name="ZENITH")
+            mock_submit.assert_called_once()
+        self.assertEqual(code, 0)
+
+    def test_cli_custom_agent_name_passed_to_create_session(self):
+        """CLI with custom --agent-name must pass that exact name to create_session."""
+        mock_initial = {
+            "session_id": "live-custom-1",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 6}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": False,
+            "score": 0,
+        }
+        mock_move_resp = {
+            "session_id": "live-custom-1",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 5}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": True,
+            "score": 100,
+            "won": True,
+            "result": "applied",
+        }
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with patch.object(ArenaClient, "create_session", return_value=mock_initial) as mock_create, \
+             patch.object(ArenaClient, "submit_action", return_value=mock_move_resp) as mock_submit:
+            code = run_cli(
+                ["--live", "--mock-model", "--agent-name", "TEST_TEAM_ALPHA", "--log-dir", self._tmp_dir],
+                input_fn=lambda _: "YES",
+                stdout=stdout,
+                stderr=stderr,
+            )
+            mock_create.assert_called_once_with(game="snake", agent_name="TEST_TEAM_ALPHA")
+            mock_submit.assert_called_once()
+        self.assertEqual(code, 0)
+
+    def test_cli_end_to_end_post_payload_exact_agent_name_field(self):
+        """End-to-end: CLI --agent-name ZENITH must serialize into POST body with exact field agent_name='ZENITH'."""
+        mock_resp_create = {
+            "session_id": "live-e2e-zenith",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 6}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": False,
+            "score": 0,
+        }
+        mock_resp_action = {
+            "session_id": "live-e2e-zenith",
+            "game": "snake",
+            "state": {"snake": [{"x": 6, "y": 5}], "food": {"x": 6, "y": 5}, "direction": "up"},
+            "done": True,
+            "score": 100,
+            "won": True,
+            "result": "applied",
+        }
+
+        def mock_urlopen_router(req: urllib.request.Request, timeout=None):
+            resp = MagicMock()
+            resp.status = 200
+            resp.__enter__.return_value = resp
+            resp.__exit__.return_value = False
+            if req.full_url.endswith("/sessions"):
+                resp.read.return_value = json.dumps(mock_resp_create).encode("utf-8")
+            else:
+                resp.read.return_value = json.dumps(mock_resp_action).encode("utf-8")
+            return resp
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen_router) as mock_urlopen:
+            code = run_cli(
+                ["--live", "--mock-model", "--agent-name", "ZENITH", "--log-dir", self._tmp_dir],
+                input_fn=lambda _: "YES",
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+            mock_urlopen.assert_called()
+            # Inspect first request which is create_session (POST /sessions)
+            first_req: urllib.request.Request = mock_urlopen.call_args_list[0][0][0]
+            self.assertEqual(first_req.get_method(), "POST")
+            self.assertTrue(first_req.full_url.endswith("/sessions"))
+            post_body = json.loads(first_req.data.decode("utf-8"))
+            self.assertEqual(post_body, {"game": "snake", "agent_name": "ZENITH"})
+            self.assertIn("agent_name", post_body)
+            self.assertEqual(post_body["agent_name"], "ZENITH")
+            self.assertNotIn("agentName", post_body)
+
+        self.assertEqual(code, 0)
+
+    def test_cli_preserves_session_metadata_file(self):
+        """CLI must preserve creation response and attribution metadata in {session_id}_meta.json."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        code = run_cli(
+            ["--dry-run", "--mock-model", "--log-dir", self._tmp_dir, "--max-moves", "2"],
+            stdout=stdout,
+            stderr=stderr,
+        )
+        self.assertEqual(code, 0)
+
+        meta_files = list(Path(self._tmp_dir).glob("*_meta.json"))
+        self.assertEqual(len(meta_files), 1)
+        with open(meta_files[0], "r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+        self.assertEqual(meta["agent_name"], "ZENITH")
+        self.assertEqual(meta["game"], "snake")
+        self.assertEqual(meta["mode"], "dry_run")
+        self.assertIn("initial_response", meta)
+        self.assertIn("session_id", meta)
+
     def test_live_creation_error_exits_with_code_1(self):
         """Network error during live session creation returns exit code 1."""
         stdout = io.StringIO()

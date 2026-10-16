@@ -93,6 +93,33 @@ class TestArenaClient(unittest.TestCase):
         self.assertEqual(sent_body, {"game": "2048", "agent_name": "TEST_BOT"})
 
     @patch("urllib.request.urlopen")
+    def test_create_session_exact_payload_serialization(self, mock_urlopen):
+        """create_session must serialize exact snake_case 'agent_name' and 'game' keys only."""
+        mock_urlopen.return_value = self._mock_http_response(b'{"session_id":"s-zenith"}')
+        self.client.create_session("snake", agent_name="ZENITH")
+
+        req: urllib.request.Request = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(req.data.decode("utf-8"))
+        self.assertEqual(sorted(sent_body.keys()), ["agent_name", "game"])
+        self.assertEqual(sent_body["agent_name"], "ZENITH")
+        self.assertEqual(sent_body["game"], "snake")
+        self.assertNotIn("agentName", sent_body)
+
+    @patch("urllib.request.urlopen")
+    def test_get_leaderboard_endpoint_and_method(self, mock_urlopen):
+        """get_leaderboard must send GET request to /leaderboard/:game with no body."""
+        expected = {"game": "snake", "leaderboard": []}
+        mock_urlopen.return_value = self._mock_http_response(json.dumps(expected).encode("utf-8"))
+
+        res = self.client.get_leaderboard("snake")
+        self.assertEqual(res, expected)
+
+        req: urllib.request.Request = mock_urlopen.call_args[0][0]
+        self.assertEqual(req.full_url, "https://topgameai.com/api/arena/leaderboard/snake")
+        self.assertEqual(req.get_method(), "GET")
+        self.assertIsNone(req.data)
+
+    @patch("urllib.request.urlopen")
     def test_get_session_success(self, mock_urlopen):
         """get_session must send GET request to /sessions/:id without request body."""
         expected_response = {
