@@ -1,0 +1,76 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments and packages
+.venv/
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing, type-checking, and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Environment variables, credentials, and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System files (Windows / macOS)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Temporary, scratch, and transient output
+scratch/
+tmp/
+temp/
+*.log
+
+# Preserved submission directory (do not ignore official submission logs)
+# Usage: official submission jsonl files should be placed in submission_logs/
+!submission_logs/*.jsonl
+
+
+# Local Antigravity instructions and prompts
+/AGENTS.md
+/agent.md
+/ANTIGRAVITY_START_PROMPT.md
+/PROJECT_STATE.md
