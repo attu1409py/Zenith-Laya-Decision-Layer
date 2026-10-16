@@ -8,19 +8,26 @@ import unittest
 from unittest.mock import MagicMock
 
 from zenith.benchmark import (
+    Benchmark2048RunResult,
     BenchmarkRunResult,
+    format_2048_results_markdown,
     format_comparison_markdown,
     format_results_markdown,
     load_benchmark_json,
+    run_2048_benchmark_suite,
     run_benchmark_suite,
+    run_single_2048_benchmark,
     run_single_benchmark,
+    save_2048_benchmark_json,
     save_benchmark_json,
 )
 from zenith.decision_viewer import DecisionViewer
+from zenith.game2048_simulator import Deterministic2048Simulator
 from zenith.laya_adapter import build_snake_criteria, format_snake_state
 from zenith.runner import SessionRunner
 from zenith.session_logger import SessionLogger
 from zenith.snake_simulator import DeterministicSnakeSimulator
+
 
 
 class TestBenchmarkFormattingAndSerialization(unittest.TestCase):
@@ -293,5 +300,126 @@ class TestPromptV2Logic(unittest.TestCase):
         self.assertIn("forbidden reversal into snake body", criteria["down"])
 
 
+class Test2048BenchmarkSuite(unittest.TestCase):
+    """Test suite for 2048 benchmark functions."""
+
+    def setUp(self):
+        self._tmp_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp_dir, ignore_errors=True)
+
+    def test_2048_benchmark_dataclass_and_json(self):
+        res = Benchmark2048RunResult(
+            seed=42,
+            prompt_version="v2",
+            model_id="convaiinnovations/laya",
+            highest_tile=512,
+            score=4520,
+            tournament_score=433,
+            accepted_moves=250,
+            rejected_moves=5,
+            fallback_moves=0,
+            won=False,
+            termination_reason="no_moves_remaining",
+            avg_inference_ms=45.0,
+            min_inference_ms=40.0,
+            max_inference_ms=60.0,
+            total_time_s=11.25,
+            hash_chain_valid=True,
+            log_path="logs/bench-2048.jsonl",
+            final_grid=[[512, 256, 128, 64], [32, 16, 8, 4], [2, 0, 0, 0], [0, 0, 0, 0]],
+        )
+        out_p = os.path.join(self._tmp_dir, "test_2048.json")
+        save_2048_benchmark_json([res], out_p)
+        self.assertTrue(os.path.isfile(out_p))
+
+        md = format_2048_results_markdown([res], title="Test 2048")
+        self.assertIn("Test 2048", md)
+        self.assertIn("512", md)
+        self.assertIn("Runs Reaching >= 512:** 1/1", md)
+
+    def test_run_single_2048_benchmark_with_mock_adapter(self):
+        mock_adapter = MagicMock()
+        mock_adapter.model_id = "convaiinnovations/laya"
+        mock_adapter.prompt_version = "v2"
+
+        # Mock decide cycling directions
+        dirs = ["left", "down", "right", "up"]
+        idx = [0]
+        def _mock_decide(game, state):
+            chosen = dirs[idx[0] % len(dirs)]
+            idx[0] += 1
+            return {
+                "questions": ["Slide tiles?"],
+                "probabilities": {d: (0.7 if d == chosen else 0.1) for d in ("up", "down", "left", "right")},
+                "chosen": chosen,
+                "confidence": 0.7,
+                "source": "laya",
+            }
+        mock_adapter.decide = _mock_decide
+
+        res = run_single_2048_benchmark(
+            seed=42,
+            adapter=mock_adapter,
+            prompt_version="v2",
+            log_dir=self._tmp_dir,
+            quiet=True,
+            max_moves=10,
+        )
+
+        self.assertEqual(res.seed, 42)
+        self.assertEqual(res.prompt_version, "v2")
+        self.assertGreater(res.accepted_moves, 0)
+        self.assertTrue(res.hash_chain_valid)
+        self.assertTrue(os.path.isfile(res.log_path))
+
+    def test_generate_2048_benchmark_from_logs(self):
+        """generate_2048_benchmark_from_logs derives metrics directly from verified JSONL logs."""
+        mock_adapter = MagicMock()
+        mock_adapter.model_id = "convaiinnovations/laya"
+        mock_adapter.prompt_version = "v3"
+
+        dirs = ["left", "down", "right", "up"]
+        idx = [0]
+        def _mock_decide(game, state):
+            chosen = dirs[idx[0] % len(dirs)]
+            idx[0] += 1
+            return {
+                "questions": ["Slide tiles v3?"],
+                "probabilities": {d: (0.7 if d == chosen else 0.1) for d in ("up", "down", "left", "right")},
+                "chosen": chosen,
+                "confidence": 0.7,
+                "source": "laya",
+            }
+        mock_adapter.decide = _mock_decide
+
+        run_single_2048_benchmark(
+            seed=42,
+            adapter=mock_adapter,
+            prompt_version="v3",
+            log_dir=self._tmp_dir,
+            quiet=True,
+            max_moves=15,
+        )
+
+        from zenith.benchmark import generate_2048_benchmark_from_logs
+        derived_results = generate_2048_benchmark_from_logs(
+            seeds=[42],
+            prompt_version="v3",
+            log_dir=self._tmp_dir,
+        )
+
+        self.assertEqual(len(derived_results), 1)
+        r = derived_results[0]
+        self.assertEqual(r.seed, 42)
+        self.assertEqual(r.prompt_version, "v3")
+        self.assertGreater(r.accepted_moves, 0)
+        self.assertGreater(r.highest_tile, 0)
+        self.assertTrue(r.hash_chain_valid)
+        self.assertEqual(r.termination_reason, "no_moves_remaining")
+
+
 if __name__ == "__main__":
     unittest.main()
+

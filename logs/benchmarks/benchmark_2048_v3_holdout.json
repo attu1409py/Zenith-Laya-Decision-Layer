@@ -1,0 +1,272 @@
+[
+  {
+    "seed": 99,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 512,
+    "score": 5812,
+    "tournament_score": 434,
+    "accepted_moves": 413,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 52.51,
+    "min_inference_ms": 49,
+    "max_inference_ms": 437,
+    "total_time_s": 22.23,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v3-99.jsonl",
+    "final_grid": [
+      [
+        4,
+        512,
+        64,
+        32
+      ],
+      [
+        64,
+        128,
+        32,
+        2
+      ],
+      [
+        32,
+        16,
+        8,
+        4
+      ],
+      [
+        2,
+        8,
+        4,
+        2
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 413,
+      "last_action": "left",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 512 in top-col 1 [outer wall], score: 5808, empty cells: 0) is:\n+------+------+------+------+\n|    4 |  512 |   64 |   32 |\n+------+------+------+------+\n|   64 |  128 |   32 |    2 |\n+------+------+------+------+\n|   32 |   16 |    8 |    4 |\n+------+------+------+------+\n|    2 |    8 |    2 |    2 |\n+------+------+------+------+\nStrategic priority: Keep your highest tile (512) anchored in a corner or outer wall, and merge matching numbers to free space.\nMoving up or down is forbidden because no tiles can move or merge.\nMoving left or right merges matching tiles to gain points and free space.\nWhich valid direction (up, down, left, right) should you choose to preserve your anchor, merge numbers, and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.1746,
+          "down": 0.1498,
+          "left": 0.3747,
+          "right": 0.3008
+        },
+        "chosen": "left",
+        "confidence": 0.3747,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          4,
+          512,
+          64,
+          32
+        ],
+        [
+          64,
+          128,
+          32,
+          2
+        ],
+        [
+          32,
+          16,
+          8,
+          4
+        ],
+        [
+          2,
+          8,
+          4,
+          2
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 123,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 128,
+    "score": 1536,
+    "tournament_score": 144,
+    "accepted_moves": 164,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 50.14,
+    "min_inference_ms": 49,
+    "max_inference_ms": 52,
+    "total_time_s": 8.46,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v3-123.jsonl",
+    "final_grid": [
+      [
+        32,
+        16,
+        4,
+        2
+      ],
+      [
+        8,
+        64,
+        128,
+        16
+      ],
+      [
+        4,
+        32,
+        16,
+        8
+      ],
+      [
+        16,
+        4,
+        2,
+        4
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 164,
+      "last_action": "left",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 128 in inner center [inner center], score: 1532, empty cells: 0) is:\n+------+------+------+------+\n|   32 |   16 |    2 |    2 |\n+------+------+------+------+\n|    8 |   64 |  128 |   16 |\n+------+------+------+------+\n|    4 |   32 |   16 |    8 |\n+------+------+------+------+\n|   16 |    4 |    2 |    4 |\n+------+------+------+------+\nStrategic priority: Keep your highest tile (128) anchored in a corner or outer wall, and merge matching numbers to free space.\nMoving up or down is forbidden because no tiles can move or merge.\nMoving left or right merges matching tiles to gain points and free space.\nWhich valid direction (up, down, left, right) should you choose to preserve your anchor, merge numbers, and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.1816,
+          "down": 0.1287,
+          "left": 0.4499,
+          "right": 0.2398
+        },
+        "chosen": "left",
+        "confidence": 0.4499,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          32,
+          16,
+          4,
+          2
+        ],
+        [
+          8,
+          64,
+          128,
+          16
+        ],
+        [
+          4,
+          32,
+          16,
+          8
+        ],
+        [
+          16,
+          4,
+          2,
+          4
+        ]
+      ]
+    }
+  },
+  {
+    "seed": 777,
+    "prompt_version": "v3",
+    "model_id": "convaiinnovations/laya",
+    "highest_tile": 256,
+    "score": 2792,
+    "tournament_score": 288,
+    "accepted_moves": 241,
+    "rejected_moves": 0,
+    "fallback_moves": 0,
+    "won": false,
+    "termination_reason": "no_moves_remaining",
+    "avg_inference_ms": 50.02,
+    "min_inference_ms": 49,
+    "max_inference_ms": 52,
+    "total_time_s": 12.37,
+    "hash_chain_valid": true,
+    "log_path": "logs\\benchmarks\\bench-2048-v3-777.jsonl",
+    "final_grid": [
+      [
+        256,
+        64,
+        16,
+        2
+      ],
+      [
+        16,
+        32,
+        2,
+        16
+      ],
+      [
+        8,
+        64,
+        32,
+        8
+      ],
+      [
+        4,
+        8,
+        4,
+        2
+      ]
+    ],
+    "failure_details": {
+      "termination_reason": "no_moves_remaining",
+      "last_step": 241,
+      "last_action": "left",
+      "last_decision": {
+        "questions": [
+          "The current 2048 board (highest tile: 256 in top-left [corner], score: 2788, empty cells: 0) is:\n+------+------+------+------+\n|  256 |   64 |   16 |    2 |\n+------+------+------+------+\n|   16 |   32 |    2 |   16 |\n+------+------+------+------+\n|    8 |   64 |   32 |    8 |\n+------+------+------+------+\n|    4 |    8 |    2 |    2 |\n+------+------+------+------+\nStrategic priority: Keep your highest tile (256) anchored in a corner or outer wall, and merge matching numbers to free space.\nMoving up or down is forbidden because no tiles can move or merge.\nMoving left or right merges matching tiles to gain points and free space.\nWhich valid direction (up, down, left, right) should you choose to preserve your anchor, merge numbers, and build toward tile 512?"
+        ],
+        "probabilities": {
+          "up": 0.1396,
+          "down": 0.1301,
+          "left": 0.3757,
+          "right": 0.3546
+        },
+        "chosen": "left",
+        "confidence": 0.3757,
+        "source": "laya"
+      },
+      "grid_final": [
+        [
+          256,
+          64,
+          16,
+          2
+        ],
+        [
+          16,
+          32,
+          2,
+          16
+        ],
+        [
+          8,
+          64,
+          32,
+          8
+        ],
+        [
+          4,
+          8,
+          4,
+          2
+        ]
+      ]
+    }
+  }
+]

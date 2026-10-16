@@ -14,14 +14,19 @@ from zenith.decision_validator import DecisionValidationError
 from zenith.laya_adapter import (
     APPROVED_MODEL_ID,
     CRITERIA,
+    CRITERIA_2048,
     QUESTION_KEY,
     LayaAdapter,
     LayaInferenceError,
     LayaResponseContractError,
+    _describe_2048_tile_position,
     _parse_coord,
+    build_2048_criteria,
     build_laya_questions,
     build_snake_criteria,
     extract_and_validate_choice_response,
+    format_2048_grid_ascii,
+    format_2048_state,
     format_snake_state,
 )
 from zenith.decision_viewer import DecisionViewer
@@ -454,7 +459,7 @@ class TestLayaAdapter(unittest.TestCase):
         agent = MockLayaAgent()
         adapter = LayaAdapter(agent=agent)
         with self.assertRaises(ValueError):
-            adapter.decide("2048", {})
+            adapter.decide("doom", {})
         with self.assertRaises(ValueError):
             adapter.decide("chess", {})
 
@@ -556,5 +561,214 @@ class TestBuildSnakeCriteriaAndV2(unittest.TestCase):
         self.assertIn("right", p_state["safe_moves"])
 
 
+class Test2048AdapterFeatures(unittest.TestCase):
+    """Tests for 2048 state formatting, criteria building, and decision routing."""
+
+    def test_format_2048_grid_ascii(self):
+        grid = [
+            [2, 4, 8, 16],
+            [32, 64, 128, 256],
+            [512, 1024, 2048, 0],
+            [0, 0, 0, 0],
+        ]
+        ascii_art = format_2048_grid_ascii(grid)
+        self.assertIn("2", ascii_art)
+        self.assertIn("2048", ascii_art)
+        self.assertIn("+------+------+------+------+", ascii_art)
+
+    def test_format_2048_state_v1(self):
+        state = {
+            "grid": [
+                [2, 0, 0, 0],
+                [0, 4, 0, 0],
+                [0, 0, 8, 0],
+                [0, 0, 0, 16],
+            ],
+            "score": 100,
+            "best": 16,
+        }
+        p_state, q_text = format_2048_state(state, prompt_version="v1")
+        self.assertEqual(p_state["game"], "2048")
+        self.assertEqual(p_state["highest_tile"], 16)
+        self.assertEqual(p_state["score"], 100)
+        self.assertEqual(p_state["empty_cells"], 12)
+        self.assertIn("highest tile: 16", q_text)
+        self.assertIn("Which direction (up, down, left, right) should you slide", q_text)
+
+    def test_format_2048_state_v2(self):
+        # Board where left merges, right is no-op, up slides
+        state = {
+            "grid": [
+                [2, 2, 0, 0],
+                [4, 0, 0, 0],
+                [8, 0, 0, 0],
+                [16, 0, 0, 0],
+            ],
+            "score": 40,
+            "best": 16,
+        }
+        p_state, q_text = format_2048_state(state, prompt_version="v2")
+        self.assertEqual(p_state["game"], "2048")
+        self.assertIn("left", p_state["valid_moves"])
+        self.assertIn("merges matching tiles", q_text)
+        self.assertIn("has no effect", q_text)
+
+    def test_format_2048_state_malformed_and_incomplete(self):
+        # Empty dict
+        p_state, q_text = format_2048_state({})
+        self.assertEqual(p_state["grid"], [[0] * 4 for _ in range(4)])
+        self.assertEqual(p_state["highest_tile"], 0)
+        self.assertEqual(p_state["score"], 0)
+
+        # Malformed grid
+        p_state2, _ = format_2048_state({"grid": "not a list"})
+        self.assertEqual(p_state2["grid"], [[0] * 4 for _ in range(4)])
+
+    def test_build_2048_criteria_v1_and_v2(self):
+        state = {
+            "grid": [
+                [2, 2, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ],
+        }
+        crit_v1 = build_2048_criteria(state, prompt_version="v1")
+        self.assertEqual(crit_v1, CRITERIA_2048)
+
+        crit_v2 = build_2048_criteria(state, prompt_version="v2")
+        self.assertIn("Merges matching tiles for +4 points", crit_v2["left"])
+        # Moving up or down does not change anything in row 0 if empty? Wait, up doesn't change [2, 2, 0, 0] at top!
+        self.assertIn("invalid no-op move", crit_v2["up"])
+
+    def test_laya_adapter_decide_2048(self):
+        agent = MockLayaAgent()
+        adapter = LayaAdapter(agent=agent, prompt_version="v2")
+
+        state = {
+            "grid": [
+                [2, 0, 0, 2],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ],
+            "score": 10,
+            "best": 2,
+        }
+        dec = adapter.decide("2048", state)
+        self.assertEqual(dec["source"], "laya")
+        self.assertEqual(dec["chosen"], "right")
+        self.assertIn(dec["chosen"], ("up", "down", "left", "right"))
+        self.assertEqual(dec["confidence"], dec["probabilities"][dec["chosen"]])
+
+        # Check metadata preserved
+        meta = adapter.get_last_metadata()
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta["game"], "2048")
+        self.assertIn("inference_ms", meta)
+
+    def test_laya_adapter_rejects_unsupported_game(self):
+        agent = MockLayaAgent()
+        adapter = LayaAdapter(agent=agent)
+        with self.assertRaises(ValueError) as ctx:
+            adapter.decide("chess", {})
+        self.assertIn("only supports 'snake' and '2048'", str(ctx.exception))
+
+    def test_describe_2048_tile_position(self):
+        grid = [
+            [128, 4, 8, 16],
+            [2, 64, 4, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 256],
+        ]
+        # Corner: (0, 0)
+        pos, loc_type, name = _describe_2048_tile_position(grid, 128)
+        self.assertEqual(pos, (0, 0))
+        self.assertEqual(loc_type, "corner")
+        self.assertEqual(name, "top-left")
+
+        # Corner: (3, 3)
+        pos, loc_type, name = _describe_2048_tile_position(grid, 256)
+        self.assertEqual(pos, (3, 3))
+        self.assertEqual(loc_type, "corner")
+        self.assertEqual(name, "bottom-right")
+
+        # Edge: (0, 2)
+        pos, loc_type, name = _describe_2048_tile_position(grid, 8)
+        self.assertEqual(pos, (0, 2))
+        self.assertEqual(loc_type, "outer wall")
+        self.assertEqual(name, "top-col 2")
+
+        # Inner center: (1, 1)
+        pos, loc_type, name = _describe_2048_tile_position(grid, 64)
+        self.assertEqual(pos, (1, 1))
+        self.assertEqual(loc_type, "inner center")
+        self.assertEqual(name, "inner center")
+
+        # Not found
+        pos, loc_type, name = _describe_2048_tile_position(grid, 9999)
+        self.assertIsNone(pos)
+        self.assertEqual(loc_type, "unknown")
+
+    def test_format_2048_state_v3(self):
+        state = {
+            "grid": [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 128, 64, 0],
+            ],
+            "score": 800,
+            "best": 128,
+        }
+        p_state, q_text = format_2048_state(state, prompt_version="v3")
+        self.assertEqual(p_state["game"], "2048")
+        self.assertEqual(p_state["highest_tile"], 128)
+        self.assertIn("Strategic priority:", q_text)
+        self.assertIn("anchored in a corner or outer wall", q_text)
+        self.assertIn("bottom-col 1 [outer wall]", q_text)
+        self.assertIn("left", p_state["valid_moves"])
+        self.assertIn("right", p_state["valid_moves"])
+        self.assertIn("up", p_state["valid_moves"])
+
+    def test_build_2048_criteria_v3(self):
+        state = {
+            "grid": [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [128, 128, 4, 0],
+            ],
+            "score": 1000,
+            "best": 128,
+        }
+        crit = build_2048_criteria(state, prompt_version="v3")
+        # Left merges 128+128 to 256 in bottom-left corner!
+        self.assertIn("NEW highest tile 256 in bottom-left", crit["left"])
+        # Up slides upward out of bottom row
+        self.assertIn("Safe move: shifts tiles safely without merging", crit["up"])
+        # Down is no-op
+        self.assertIn("Do not choose: forbidden no-op move with zero movement", crit["down"])
+
+    def test_laya_adapter_decide_2048_v3(self):
+        agent = MockLayaAgent()
+        adapter = LayaAdapter(agent=agent, prompt_version="v3")
+        state = {
+            "grid": [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [64, 32, 16, 8],
+            ],
+            "score": 500,
+            "best": 64,
+        }
+        dec = adapter.decide("2048", state)
+        self.assertEqual(dec["source"], "laya")
+        self.assertIn(dec["chosen"], ("up", "down", "left", "right"))
+        self.assertEqual(dec["confidence"], dec["probabilities"][dec["chosen"]])
+
+
 if __name__ == "__main__":
     unittest.main()
+

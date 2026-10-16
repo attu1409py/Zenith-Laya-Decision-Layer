@@ -1,114 +1,112 @@
 # Team ZENITH - Project State
 
-**Last updated:** 2026-10-17 (Task 07A completed)\
+**Last updated:** 2026-10-17 (Task M6C completed)\
 **Project:** Laya decision layer for PS 02 - Beat the Bot\
 **Team/agent name:** `ZENITH`
 
 ## Current status
 
-**Status: TASK 07A COMPLETED / RUN HISTORY AGGREGATOR & LEADERBOARD ATTRIBUTION AUDIT (197 TESTS PASSING)**
+**Status: TASK M6C COMPLETED / 2048 v3 BENCHMARK INTEGRITY AUDIT & RECONCILIATION (233 TESTS PASSING)**
 
-Task 07A established a centralized run history aggregator, verified all session audit logs, and completed a comprehensive attribution audit of the official Snake run (`f240cb86-0d3d-4445-9708-79989ecff36e`):
-- **Part A: Leaderboard Attribution Audit Findings:**
-  - **Code Path & Serialization Confirmed:** Traced CLI `--agent-name` -> `run_cli` -> `ArenaClient.create_session(game='snake', agent_name='ZENITH')`. The request strictly sends `{"game": "snake", "agent_name": "ZENITH"}` in the HTTP POST body. Regression tests verify end-to-end serialization with no modifications or deviations.
-  - **Read-Only Leaderboard Query (`GET /leaderboard/snake`):** Returned exactly 20 entries. All 20 entries have `score: 1000` and are strictly sorted in chronologically ascending order (`ORDER BY timestamp ASC LIMIT 20`).
-  - **Cutoff Timestamp Limitation:** Rank 20 cutoff timestamp is `1792161489372`. ZENITH's official run completed at timestamp `1792177472000` (~4.4 hours later), placing it outside the 20-entry window returned by the server-side API.
-  - **Server-Side Session Echo Limitation:** TopGameAI Arena `GET /sessions/:id` and action endpoints do not echo an `agent_name` field.
-  - **Local Attribution Preservation Added:** Added `SessionLogger.save_metadata()` to persist `{session_id}_meta.json` recording `agent_name`, `model_id`, `prompt_version`, and initial creation response.
-- **Part B: Central Run History Aggregator (`zenith/aggregator.py`):**
-  - Consolidates runs from `logs/` and `logs/benchmarks/` into standardized, non-fabricated summaries.
-  - Generates:
-    - `logs/benchmarks/run_history.jsonl`: compact JSONL summary records.
-    - `logs/benchmarks/run_history.csv`: tabular CSV representation.
-    - `logs/benchmarks/benchmark_report.md`: human-readable markdown report with attribution audit, benchmark comparisons, and non-equivalence notices.
-  - Aggregated 12 runs: 1 live Arena, 10 local simulator benchmarks, 1 mock.
-  - **100% SHA-256 Hash-Chain Integrity:** All 12 session logs independently verified valid via `verify_jsonl_file` (including official run `f240cb86-0d3d-4445-9708-79989ecff36e`: 152 records, 1000 score, won=True).
-- **Audit & Test Suite Status:**
-  - **197 unit tests** passing in ~3.06s, 100% pass rate (0 failures, 0 errors).
-  - Zero live Arena competition calls made or consumed.
+Task M6C conducted a forensic audit across all raw v3 JSONL logs, final response payloads, benchmark JSON summaries, and the consolidated run history, establishing a single source of truth derived directly from verified disk records:
+- **Seed 13 Discrepancy Forensic Resolution:**
+  - Audited `bench-2048-v3-13.jsonl` directly: contains 265 total records consisting of **247 applied** moves, **18 rejected** moves, and 0 fallback moves across the continuous log (or 152 applied and 9 rejected in the final continuous game segment).
+  - Traced the origin of the previously reported `10` rejections to an inline script in step 1051 that explicitly assigned `rejected_moves = 0 if s != 13 else 10`. That assignment was an ungrounded guess that directly contradicted the raw log.
+  - Replaced all ad-hoc summaries with `generate_2048_benchmark_from_logs` in `zenith/benchmark.py`, which derives all counts directly from the `result` fields of verified JSONL files with zero hardcoded per-seed metrics.
+- **Continuous Multi-Segment Log Reconciliation:**
+  - Detailed audit of standard seeds `[42, 100, 2026, 7, 13]` revealed two continuous run segments preserved in append-only JSONL files:
+    - *Segment 1:* Exploratory trial with early verbose criteria (which encountered 9 consecutive rejections on each seed).
+    - *Segment 2:* Finalized v3 prompt trial (clean strategic play).
+    - Under competition rule 6 ("never delete or amend failed/abandoned logs"), the entire continuous log from `GENESIS-bench-2048-v3-{seed}` to the final line is preserved with 100% valid SHA-256 cryptographic linkage.
+  - Derived counts from verified source records:
+    - Seed 42: 409 accepted, 9 rejected (281 accepted, 0 rejected in final segment) | Best: 256 | Score: 3,320
+    - Seed 100: 162 accepted, 9 rejected (80 accepted, 0 rejected in final segment) | Best: 64 | Score: 600
+    - Seed 2026: 254 accepted, 9 rejected (235 accepted, 0 rejected in final segment) | Best: 256 | Score: 2,844
+    - Seed 7: 391 accepted, 9 rejected (312 accepted, 0 rejected in final segment) | Best: 512 | Score: 4,588
+    - Seed 13: 247 accepted, 18 rejected (152 accepted, 9 rejected in final segment) | Best: 256 | Score: 1,960
+  - Holdout seeds `[99, 123, 777]` have single-segment continuous logs with 0 rejections across all 818 moves (Seed 99 reached 512 with 5,812 pts).
+- **Audit & Cryptographic Verification:**
+  - **233 unit tests** passing in ~4.45s, 100% pass rate (0 failures, 0 errors) [PASS].
+  - Aggregated 31 total runs across `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md`.
+  - **31 / 31 (100.0%) SHA-256 hash chains independently verified valid** [PASS].
+  - Zero live Arena competition calls made or consumed during this milestone.
 
-## Files created / changed in Task 07A
+## Files created / changed in Task M6C
 
-- `zenith/aggregator.py` (run history discovery, classification, hash verification, JSONL/CSV/Markdown exporters)
-- `zenith/session_logger.py` (added `save_metadata` method for preserving creation response and attribution metadata)
-- `zenith/main.py` (persists session creation metadata sidecar during session initialization)
-- `logs/benchmarks/run_history.jsonl` (compact consolidated summary records for all 12 discovered runs)
-- `logs/benchmarks/run_history.csv` (tabular CSV export of all 12 runs)
-- `logs/benchmarks/benchmark_report.md` (comprehensive markdown report and leaderboard attribution audit)
-- `tests/test_aggregator.py` (9 unit tests for discovery, parsing, hash verification, deduplication, CSV/JSONL parity, and CLI)
-- `tests/test_arena_client.py` (added tests for exact POST body serialization and `get_leaderboard`)
-- `tests/test_cli.py` (added 4 regression tests for explicit/custom `--agent-name` propagation and metadata persistence)
-- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (updated project status and milestone history)
-- `logs/benchmarks/baseline_v1.json` & `revised_v2.json` (persisted benchmark records)
-- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (documented benchmarks, empirical findings, and next steps)
+- `zenith/benchmark.py` (added `generate_2048_benchmark_from_logs` to derive metrics directly from verified JSONL source logs without hardcoded metrics)
+- `zenith/aggregator.py` (reconciled `steps` and `applied_moves` to derive directly from JSONL records, added `last_score` tracking in `parse_jsonl_session`)
+- `tests/test_benchmark.py` (added `test_generate_2048_benchmark_from_logs` unit test; 233 total tests in suite)
+- `logs/benchmarks/benchmark_2048_v3.json` (regenerated directly from source logs without hardcoding)
+- `logs/benchmarks/run_history.jsonl`, `run_history.csv`, `benchmark_report.md` (re-aggregated with 100% reconciled source metrics)
+- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (updated with audit findings, reconciled metrics, and next steps)
 
-## Benchmark Baseline (v1) vs Revised (v2) Comparison
+## 2048 Benchmark Comparison: Baseline (v1) vs Revised (v2) vs Strategic (v3)
 
-| Seed | Base Score | Rev Score | Base Food | Rev Food | Base Moves | Rev Moves | Base Won | Rev Won | Base Reason | Rev Reason |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 7 | 0 | 660 | 0 | 11 | 7 | 114 | NO | NO | `wall_collision` | `self_collision` |
-| 13 | 60 | 660 | 1 | 11 | 7 | 64 | NO | NO | `wall_collision` | `self_collision` |
-| 42 | 0 | 1000 | 0 | 15 | 7 | 105 | NO | YES | `wall_collision` | `target_food_reached` |
-| 100 | 0 | 1000 | 0 | 15 | 7 | 151 | NO | YES | `wall_collision` | `target_food_reached` |
-| 2026 | 60 | 1000 | 1 | 15 | 7 | 113 | NO | YES | `wall_collision` | `target_food_reached` |
+### Standard 5-Seed Set (Reconciled from Source Records)
 
-- **Baseline (v1):** Total Food = 2, Avg Score = 24.0, Wins = 0/5 (0%)
-- **Revised (v2):** Total Food = 67, Avg Score = 864.0, Wins = 3/5 (60%)
-- **Average Inference Latency:** ~49 ms / decision on NVIDIA RTX 3050 Laptop GPU.
+| Seed | v1 Best | v2 Best | v3 Best Tile | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves (Total / Seg2) | v3 Rej (Total / Seg2) | v3 Reason |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 7 | 8 | 128 | **512** | 12 | 1,716 | **4,588** | 3 | 170 | **391** (312) | **9** (0) | `no_moves_remaining` |
+| 13 | 8 | 64 | **256** | 16 | 616 | **1,960** | 6 | 85 | **247** (152) | **18** (9) | `no_moves_remaining` |
+| 42 | 8 | 128 | **256** | 20 | 1,316 | **3,320** | 6 | 136 | **409** (281) | **9** (0) | `no_moves_remaining` |
+| 100 | 8 | 128 | **64** | 16 | 1,392 | **600** | 4 | 145 | **162** (80) | **9** (0) | `no_moves_remaining` |
+| 2026 | 4 | 256 | **256** | 12 | 3,472 | **2,844** | 7 | 292 | **254** (235) | **9** (0) | `no_moves_remaining` |
+
+- **v1 Baseline:** Max Tile = 8, Avg Tile = 7.2, Avg Score = 15.2, 0% completion (momentum loop).
+- **v2 Baseline:** Max Tile = 256, Avg Tile = 140.8, Avg Score = 1,702.4, 20% reaching >= 256, 0% reaching 512.
+- **v3 Strategic:** Max Tile = **512**, Avg Tile = **268.8** (+90.9% over v2), Avg Score = **2,662.4** (+56.4% over v2), **80% reaching >= 256**, **20% reaching 512**.
+
+### Holdout 3-Seed Set (Unseen during design)
+
+| Seed | Prompt | Best Tile | Merge Score | Accepted Moves | Rejections | Won | Termination Reason | Chain Valid |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 99 | v3 | **512** | **5,812** | **413** | **0** | NO | `no_moves_remaining` | **PASS** |
+| 123 | v3 | **128** | **1,536** | **164** | **0** | NO | `no_moves_remaining` | **PASS** |
+| 777 | v3 | **256** | **2,792** | **241** | **0** | NO | `no_moves_remaining` | **PASS** |
+
+- **Holdout Averages:** Max Tile = **512**, Avg Tile = **298.7**, Avg Merge Score = **3,380.0**, Rejection Rate = **0.0%**.
 
 ## Verified facts & module capabilities
 
 - **Laya Decision Adapter (`LayaAdapter`):**
   - Connects `convaiinnovations/laya` via `agent.predict(prompt_state, questions)`.
   - Supports dependency injection for testing via `agent` parameter.
-  - Supports selectable prompt strategies: `v1` (baseline) and `v2` (optimized context-aware safety/food navigation).
+  - Supports both `snake` (v1, v2) and `2048` (v1, v2, v3) with selectable prompt versions.
+  - Formats 4x4 ASCII board and context-aware move criteria detailing merge points, empty cell counts, and anchor preservation.
   - Strictly validates response structure: requires `answers[question_key]`, `choice in VALID_DIRECTIONS`, probabilities dictionary with exactly the 4 keys, all probabilities numeric floats in `[0.0, 1.0]`, sum in `[0.98, 1.02]`.
   - Sets competition `confidence = probabilities[chosen]` exactly.
   - Stores diagnostics (`inference_ms`, `raw_laya_confidence`, `raw_answer_confidence`, `token_usage`, `model_name`, `question_text`, `prompt_state`) on `adapter.last_metadata`.
+- **Deterministic 2048 Simulator (`Deterministic2048Simulator`):**
+  - Rule-compliant 4x4 grid, single-merge-per-move rule, 90/10 tile spawning, no-op move rejection.
+  - Reproducible pseudo-random seeding via standard library `random.Random(seed)`.
+  - Conforms to `ArenaAdapter` protocol (`create_session`, `get_session`, `submit_action`).
 - **Session Runner (`SessionRunner`):**
   - Duck-typed `ArenaAdapter` protocol and `DecideFn` callable interface.
-  - Full game loop: get_session → decide_fn → validate_decision → submit_action → log_move → show_move.
+  - Full game loop: get_session -> decide_fn -> validate_decision -> submit_action -> log_move -> show_move.
   - Tracks applied/rejected/fallback/total move counts.
   - Guards against runaway consecutive rejections via `max_consecutive_rejections=10`.
   - Automatically saves final response and verifies hash chain upon completion.
-- **Deterministic Local Snake Simulator (`DeterministicSnakeSimulator`):**
-  - Rule-compliant 12x12 grid, 180-degree reversal rejection, wall/body collision termination, food consumption and growth.
-  - Reproducible pseudo-random food seeding via standard library `random.Random(seed)`.
-  - Conforms to `ArenaAdapter` protocol.
-- **Benchmark Suite (`zenith/benchmark.py`):**
-  - Batch runner across customizable seeds.
+- **Benchmark Suite (`zenith/benchmark.py` & `zenith/aggregator.py`):**
+  - Supports batch benchmarking for both `snake` and `2048` across v1, v2, and v3.
+  - Generates summaries directly from verified JSONL files with zero hardcoding (`generate_2048_benchmark_from_logs`).
   - JSON persistence and side-by-side Markdown comparison formatting.
-
-## Commands and tests executed
-
-1. `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` → **179 tests ran in 3.123s, 179 passed, 0 failed, 0 errors (OK)**.
-   - 24 tests from Task 01 (`test_hash_chain.py`)
-   - 18 tests from Task 02 (`test_arena_client.py`)
-   - 27 tests from Task 03 (`test_decision_validator.py`)
-   - 11 tests from Task 03 (`test_session_logger.py`)
-   - 22 tests from Task 04 (`test_decision_viewer.py`)
-   - 14 tests from Task 04 (`test_runner.py`)
-   - 26 tests from Task 05B/05C/06A (`test_laya_adapter.py`)
-   - 17 tests from Task 06/06A (`test_cli.py`)
-   - 12 tests from Task 06B (`test_snake_simulator.py`)
-   - 8 tests from Task 06B (`test_benchmark.py`)
-2. Baseline benchmark run: `.\.venv\Scripts\python.exe -m zenith.benchmark --seeds 42 100 2026 7 13 --prompt-version v1 --output logs/benchmarks/baseline_v1.json` → Exit code 0 (all 5 seeds wall-collided at step 7, avg score 24.0).
-3. Revised benchmark run: `.\.venv\Scripts\python.exe -m zenith.benchmark --seeds 42 100 2026 7 13 --prompt-version v2 --output logs/benchmarks/revised_v2.json --compare logs/benchmarks/baseline_v1.json` → Exit code 0 (3 wins, 2 scores of 660, avg score 864.0, valid hash chains).
+  - Consolidated 31 runs into `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md`.
 
 ## Known limitations & simulator equivalence status
 
-1. **Simulator Equivalence Disclaimer:**
-   - While `DeterministicSnakeSimulator` strictly follows the documented Arena rules (12x12, 15 target foods, 300 max moves, reversal rejections, standard scoring), **local simulator performance does not guarantee identical Arena performance**. The exact internal PRNG seed mapping and food placement sequence on the live TopGameAI Arena server are server-side and unverified until a real session is played.
-2. **Step Numbering vs. Rejected Moves:**
-   - Handled in logger by accepting caller-provided `step`. Pending official organizer clarification.
+1. **2048 Simulator Equivalence Disclaimer:**
+   - While `Deterministic2048Simulator` strictly implements the documented Arena rules (4x4, powers of 2, single-merge-per-move, 90/10 spawn, no-op rejection), **local simulator performance does not guarantee identical Arena server tile spawn sequences**. The server's internal PRNG seed mapping is unverified until an official session is played.
+2. **Local 512 Qualification Feasibility:**
+   - Tile 512 was achieved twice on local evaluation (Seed 7: 4,588 pts; Holdout Seed 99: 5,812 pts).
+   - 80% of standard seeds and 67% of holdout seeds reached tile 256 or higher, demonstrating reproducible strategic survival.
 
 ## Proposed next task
 
-**Milestone M5: Single Controlled Live Snake Qualifying Session**
-- Obtain explicit operator authorization to connect to live TopGameAI Arena servers.
-- Execute one controlled live Snake run via `python run_session.py --live --prompt-version v2`.
-- Monitor live terminal viewer, real HTTP request timings, genuine Laya inference latency, and session progression.
-- Verify that score, moves, hash chain, and final response JSON are saved and verified.
+**Milestone M7: Controlled Official 2048 Qualifying Run Targeting Tile 512**
+- Review local 2048 v3 benchmark performance and confirm operator approval.
+- Execute one controlled official 2048 session via `python run_session.py --game 2048 --live --prompt-version v3`.
+- Target reaching tile 512 or higher to achieve Stage 2 qualification.
+- Preserve all session audit logs, verify SHA-256 hash chain, and update run aggregator.
 
 ## Major milestone history
 
@@ -124,3 +122,6 @@ Task 07A established a centralized run history aggregator, verified all session 
 - **2026-10-16 | Hotfix 06A LayaAdapter Constructor Call Fixed:** Fixed `LayaAdapter(model_id=APPROVED_MODEL_ID)` call in `zenith/main.py` resolving unexpected keyword argument error. Added regression tests (159 total tests passing). Genuine local model smoke test verified in 299.51 ms.
 - **2026-10-17 | Task 06B Local Laya Snake Benchmark & Prompt Optimization Completed:** Built `DeterministicSnakeSimulator` and `zenith/benchmark.py`. Analyzed v1 baseline failure pattern (momentum bias -> wall crash). Optimized v2 prompt/criteria strategy. Achieved 36x score increase (24.0 -> 864.0), 3 perfect wins (1000 points, 15 foods), 100% runs above 600 qualifying threshold. Added 20 unit tests (179 total tests passing). Valid hash chains verified. Zero live Arena calls made.
 - **2026-10-17 | Task 07A Run History Aggregator & Attribution Audit Completed:** Built `zenith/aggregator.py` and exported `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md`. Audited official run `f240cb86-0d3d-4445-9708-79989ecff36e` (1000 pts, 152 steps, won=True, hash chain valid). Proved `agent_name: ZENITH` serialization via end-to-end regression tests. Identified server-side leaderboard limit 20 cutoff (FIFO timestamp order capped at `1792161489372` vs ZENITH run at `1792177472000`). Added metadata preservation sidecars. Added 18 unit tests (197 total tests passing).
+- **2026-10-17 | Task M6 2048 Adapter, Local Simulator & Benchmark Completed:** Built `Deterministic2048Simulator` and extended `LayaAdapter` for 2048. Verified official contract (4x4, powers of 2, single-merge, 90/10 spawn, no-op rejection). Benchmarked approved local Laya model across 5 seeds: v2 achieved max tile 256, avg tile 140.8, avg score 1,702.4 with 0 rejections (112x score increase over v1). Re-aggregated 23 total runs with 100% valid SHA-256 hash chains. Added 31 unit tests (228 total tests passing). Zero live Arena calls made.
+- **2026-10-17 | Task M6B 2048 Strategic Prompt Optimization (v3) Completed:** Analyzed v2 decision traces (center-cell congestion trap). Implemented v3 prompt with corner-anchor preservation, spatial positioning helper `_describe_2048_tile_position`, verifiable immediate consequence criteria. Evaluated standard 5 seeds: Seed 7 reached tile **512** (4,588 pts), 80% reached >= 256, avg tile 268.8 (+90.9% over v2). Evaluated 3 holdout seeds: Seed 99 reached tile **512** (5,812 pts, 413 moves, 0 rejections). Added 4 unit tests (232 total tests passing [PASS]). Re-aggregated 31 runs with 100% valid SHA-256 hash chains [PASS]. Zero live Arena calls made.
+- **2026-10-17 | Task M6C 2048 v3 Benchmark Integrity Audit Completed:** Audited raw v3 logs against final payloads, benchmark summaries, and aggregator tables. Reconciled seed 13 discrepancy (raw log has 18 total rejections, 9 in segment 2; removed prior hardcoded assignment of 10). Built `generate_2048_benchmark_from_logs` in `zenith/benchmark.py` and updated `zenith/aggregator.py` to derive counts directly from source JSONL records. Added unit test in `tests/test_benchmark.py` (233 total tests passing [PASS]). Regenerated `benchmark_2048_v3.json` and consolidated reports with 100% mutual consistency and valid hash chains.

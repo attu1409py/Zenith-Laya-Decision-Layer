@@ -1,0 +1,48 @@
+{
+  "session_id": "mock-2048-42",
+  "game": "2048",
+  "agent_name": "ZENITH",
+  "model_id": "mock-synthetic-model",
+  "prompt_version": "v1",
+  "mode": "dry_run",
+  "initial_response": {
+    "session_id": "mock-2048-42",
+    "game": "2048",
+    "agent_name": "ZENITH",
+    "state": {
+      "grid": [
+        [
+          0,
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "score": 0,
+      "best": 2
+    },
+    "done": false,
+    "score": 0,
+    "won": null,
+    "steps": 0,
+    "result": "applied"
+  }
+}

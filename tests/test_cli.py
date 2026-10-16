@@ -165,18 +165,19 @@ class TestCliExecution(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("DRY-RUN", stdout.getvalue())
 
-    def test_locked_game_rejected(self):
-        """Games other than 'snake' must be rejected with exit code 2."""
+    def test_unsupported_game_rejected(self):
+        """Games other than 'snake' or '2048' must be rejected with exit code 2."""
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        code = run_cli(
-            ["--game", "2048", "--mock-model"],
-            stdout=stdout,
-            stderr=stderr,
-        )
-        self.assertEqual(code, 2)
-        self.assertIn("locked", stderr.getvalue())
+        with self.assertRaises(SystemExit) as ctx:
+            run_cli(
+                ["--game", "doom", "--mock-model"],
+                stdout=stdout,
+                stderr=stderr,
+            )
+        self.assertEqual(ctx.exception.code, 2)
+
 
     def test_live_declined_confirmation_prevents_network(self):
         """Declining live confirmation must abort with exit code 2 and make no requests."""
@@ -532,8 +533,31 @@ class TestCliExecution(unittest.TestCase):
 
         self.assertEqual(code, 0)
 
+    def test_dry_run_2048_success(self):
+        """CLI successfully runs 2048 in dry-run mode with mock model."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        code = run_cli(
+            [
+                "--game", "2048",
+                "--mock-model",
+                "--log-dir", self._tmp_dir,
+                "--max-moves", "3",
+            ],
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+        self.assertEqual(code, 0, f"CLI stderr: {stderr.getvalue()}")
+        out_str = stdout.getvalue()
+        self.assertIn("ZENITH SESSION COMPLETE", out_str)
+        self.assertIn("2048", out_str)
+        self.assertIn("SHA-256 Hash Chain:   VERIFIED VALID", out_str)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
