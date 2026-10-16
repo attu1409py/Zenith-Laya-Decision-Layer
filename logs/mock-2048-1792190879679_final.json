@@ -1,0 +1,40 @@
+{
+  "session_id": "mock-2048-1792190879679-42",
+  "game": "2048",
+  "agent_name": "ZENITH",
+  "state": {
+    "grid": [
+      [
+        4,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0
+      ]
+    ],
+    "score": 4,
+    "best": 4
+  },
+  "done": true,
+  "score": 4,
+  "won": false,
+  "steps": 2,
+  "result": "applied"
+}

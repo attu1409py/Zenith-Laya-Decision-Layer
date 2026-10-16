@@ -1,0 +1,37 @@
+{
+  "session_id": "mock-snake-1792189553210",
+  "game": "snake",
+  "agent_name": "ZENITH",
+  "state": {
+    "width": 12,
+    "height": 12,
+    "snake": [
+      {
+        "x": 6,
+        "y": 0
+      },
+      {
+        "x": 6,
+        "y": 1
+      },
+      {
+        "x": 6,
+        "y": 2
+      },
+      {
+        "x": 6,
+        "y": 3
+      }
+    ],
+    "food": {
+      "x": 9,
+      "y": 6
+    },
+    "direction": "up",
+    "foodEaten": 1
+  },
+  "done": true,
+  "score": 100,
+  "won": false,
+  "result": "applied"
+}
