@@ -44,10 +44,13 @@ The new repo should not copy the custom game engines just to satisfy the competi
 | M0 | Repository and source preflight | Fast/low-cost model is sufficient | Dedicated repo confirmed; guide and docs read; Laya interface gaps identified; `PROJECT_STATE.md` updated | Completed (2026-10-16) |
 | Task 01 | Scaffolding & SHA-256 audit engine | Standard model | Git repo initialized, .gitignore configured, canonical JSON & SHA-256 hash-chain verified (24/24 tests pass) | Completed (2026-10-16) |
 | M1 (Task 05A) | Confirm & install Laya runtime | Strong reasoning model if schema/docs are ambiguous | Official package laya==0.4.8 & convaiinnovations/laya loaded on GPU; single forward pass verified (334 ms); contract valid | Completed (2026-10-16) |
+| Task 05B | Laya decision adapter integration | Strong coding model | LayaAdapter implemented; Snake state parsing; 4-way choice question; contract validation; runner integration (24 new tests, 140 total) | Completed (2026-10-16) |
+| Task 05C | Laya SDK schema verification | Strong coding model | Verified instructions/criteria schema in installed laya==0.4.8; synthetic GPU inference validated; regression test added (141 total tests) | Completed (2026-10-16) |
 | M2 (Task 02) | Arena API client | Mid-tier coding model; use stronger model for ambiguous parsing/error handling | Create session, get state, send action, capture final response; mocked unit tests pass (18/18 tests pass) | Completed (2026-10-16) |
 | M3 (Task 03) | Decision validation and logger | Strong reasoning/coding model | Probability/action/confidence validation passes tests; JSONL schema complete; SHA-256 chain integrated | Completed (2026-10-16) |
 | M4 (Task 04) | Visible decision viewer + mock runner | Mid/high coding model | Viewer stays visible; runner loop tested with mocks; no unverified live submission (22+14 = 36 new tests, 116 total) | Completed (2026-10-16) |
-| M5 | Verified Snake run | Strong reasoning for failure analysis | Final response matches last log record; hash chain intact; fallback <=10%; score >=600; session qualifies as verified | Not started |
+| Task 06 | Executable CLI & end-to-end runner | Mid/high coding model | zenith/main.py, run_session.py, MockSnakeArena, live confirmation guard, 15 tests in test_cli.py (156 total tests) | Completed (2026-10-16) |
+| M5 | Verified Snake run | Strong reasoning for failure analysis | Final response matches last log record; hash chain intact; fallback <=10%; score >=600; session qualifies as verified | Ready (Awaiting operator auth) |
 | M6 | 2048 client and prompt | Mid/high coding model | Stage unlock confirmed; 2048 runs logged and independently verified | Locked until M5 success |
 | M7 | Three best 2048 runs | Strong reasoning for log/scoring verification | Three qualifying run logs preserved; median points computed per guide; qualifying 512 tile hit if seeking optional Stage 3 | Locked until M6 is ready |
 | M8 | Optional Doom-style stage | Decide only after organizer confirms environment | Exact official environment/interface known; earlier run evidence retained | Optional / unknown |
@@ -71,6 +74,7 @@ The user selects the Antigravity model in the UI before each task; a prompt cann
 
 ## Main unresolved blockers
 
-1. The approved Laya model/runtime/API interface and credentials have not been confirmed in the project materials available so far.
+1. **RESOLVED (Task 05A/05B):** Approved Laya runtime confirmed as local `laya==0.4.8` with `convaiinnovations/laya` running on CUDA.
 2. The `step` field interpretation when rejected moves must be logged should be confirmed with the organizer if examples do not make it unambiguous.
 3. Optional Stage 3 availability and interface need confirmation.
+

@@ -133,8 +133,12 @@ class SessionRunner:
         self._fallback = fallback_tracker or FallbackTracker()
         self._max_consecutive_errors = max_consecutive_errors
 
-    def run(self) -> SessionResult:
+    def run(self, initial_session_data: Optional[Dict[str, Any]] = None) -> SessionResult:
         """Execute the game session loop and return the result.
+
+        Args:
+            initial_session_data: Optional initial session dict from create_session.
+                If provided, avoids an immediate duplicate get_session network call.
 
         Returns:
             SessionResult with full session outcome.
@@ -152,11 +156,14 @@ class SessionRunner:
         done = False
 
         # Get initial state
-        try:
-            session_data = self._arena.get_session(session_id)
-        except Exception as exc:
-            result.error = f"Failed to get initial session state: {exc}"
-            return result
+        if initial_session_data is not None:
+            session_data = dict(initial_session_data)
+        else:
+            try:
+                session_data = self._arena.get_session(session_id)
+            except Exception as exc:
+                result.error = f"Failed to get initial session state: {exc}"
+                return result
 
         while not done:
             turn_watch = MonotonicStopwatch()
