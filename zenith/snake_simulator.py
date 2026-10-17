@@ -162,7 +162,7 @@ class DeterministicSnakeSimulator:
 
     def _build_response(self, result: str = "applied") -> Dict[str, Any]:
         """Build standard Arena API response dictionary."""
-        return {
+        resp = {
             "session_id": self._session_id,
             "game": "snake",
             "agent_name": self._agent_name,
@@ -179,6 +179,9 @@ class DeterministicSnakeSimulator:
             "won": self._won,
             "result": result,
         }
+        if self._termination_reason:
+            resp["termination_reason"] = self._termination_reason
+        return resp
 
     # ── ArenaAdapter Protocol ──────────────────────────────────────────
 
@@ -274,7 +277,7 @@ class DeterministicSnakeSimulator:
         # Check move limit
         if self._accepted_moves >= self._max_moves and not self._done:
             self._done = True
-            self._won = self._food_eaten >= self._target_food
+            self._won = True if self._food_eaten >= self._target_food else None
             self._termination_reason = "max_moves_reached"
             self._calculate_score()
 

@@ -62,6 +62,7 @@ class DecisionViewer:
         # Session-level counters
         self._applied_count: int = 0
         self._rejected_count: int = 0
+        self._no_progress_count: int = 0
         self._fallback_count: int = 0
         self._total_moves: int = 0
         self._last_score: Optional[int] = None
@@ -121,6 +122,8 @@ class DecisionViewer:
             self._applied_count += 1
         elif result == "rejected":
             self._rejected_count += 1
+        elif result == "no_progress":
+            self._no_progress_count += 1
         if source == "fallback":
             self._fallback_count += 1
         if score is not None:
@@ -196,6 +199,7 @@ class DecisionViewer:
         won: Optional[bool] = None,
         hash_chain_valid: Optional[bool] = None,
         total_time_ms: Optional[int] = None,
+        status: Optional[str] = None,
     ) -> None:
         """Display the end-of-session summary panel.
 
@@ -204,6 +208,7 @@ class DecisionViewer:
             won: Whether the game was won.
             hash_chain_valid: Whether the log's hash chain verified.
             total_time_ms: Total session wall-clock time in ms.
+            status: Terminal session status label (e.g. WON, LOST, MOVE_LIMIT_REACHED, NO_PROGRESS_STOPPED).
         """
         self._write()
         self._write(SEPARATOR)
@@ -217,11 +222,15 @@ class DecisionViewer:
         score_str = str(final_score) if final_score is not None else "N/A"
         self._write(f"  Final Score: {score_str}")
 
-        won_str = "YES" if won else ("NO" if won is not None else "UNKNOWN")
+        if status is not None:
+            self._write(f"  Status     : {status}")
+        won_str = "YES" if won is True else ("NO" if won is False else "N/A")
         self._write(f"  Won        : {won_str}")
 
         self._write(f"  Applied    : {self._applied_count}")
         self._write(f"  Rejected   : {self._rejected_count}")
+        if self._no_progress_count > 0:
+            self._write(f"  No-Progress: {self._no_progress_count}")
         self._write(f"  Total Moves: {self._total_moves}")
 
         fb_pct = (self._fallback_count / self._total_moves * 100.0) if self._total_moves > 0 else 0.0

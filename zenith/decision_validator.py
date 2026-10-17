@@ -20,7 +20,7 @@ import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 VALID_DIRECTIONS: Tuple[str, ...] = ("up", "down", "left", "right")
-PERMITTED_SOURCES: Tuple[str, ...] = ("laya", "fallback")
+PERMITTED_SOURCES: Tuple[str, ...] = ("laya", "fallback", "mock")
 MIN_PROBABILITY_SUM: float = 0.98
 MAX_PROBABILITY_SUM: float = 1.02
 MAX_FALLBACK_RATIO: float = 0.10
@@ -189,14 +189,18 @@ class FallbackTracker:
         self.total_moves: int = 0
         self.fallback_moves: int = 0
         self.laya_moves: int = 0
+        self.mock_moves: int = 0
 
     def record_move(self, source: str) -> None:
-        """Record the source of a move decision ('laya' or 'fallback')."""
+        """Record the source of a move decision ('laya', 'fallback', or 'mock')."""
         if source == "fallback":
             self.fallback_moves += 1
             self.total_moves += 1
         elif source == "laya":
             self.laya_moves += 1
+            self.total_moves += 1
+        elif source == "mock":
+            self.mock_moves += 1
             self.total_moves += 1
         else:
             raise ValueError(f"Unknown decision source: {source!r}")

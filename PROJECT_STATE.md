@@ -1,32 +1,48 @@
 # Team ZENITH - Project State
 
-**Last updated:** 2026-10-17 (Task M6D completed)\
+**Last updated:** 2026-10-17 (Task M7 Hotfix Reporting Audit completed)\
 **Project:** Laya decision layer for PS 02 - Beat the Bot\
 **Team/agent name:** `ZENITH`
 
 ## Current status
 
-**Status: TASK M6D COMPLETED / FINAL BENCHMARK SEGMENT INTEGRITY CHECK (237 TESTS PASSING)**
+**Status: TASK M7 HOTFIX REPORTING AUDIT COMPLETED / MOCK ATTRIBUTION & STATUS REPORTING VERIFIED (266 TESTS PASSING)**
 
-Task M6D validated that ZENITH's consolidated benchmark history strictly distinguishes complete append-only source logs from individual evaluated game segments:
-- **Forensic Segment Disentanglement:**
-  - Standard v3 logs contain continuous append-only exploratory attempts concatenated with final evaluated game segments (fully compliant with rule 6: "never delete or amend failed/abandoned logs").
-  - Evaluated segments are identified unambiguously via step resets (`step == 1` or decreases) and state/termination markers, matching `_final.json` session records.
-  - Distinct fields are maintained across models and schemas:
-    - Whole-log metrics: `total_source_records`, `total_source_applied`, `total_source_rejected`.
-    - Selected segment metrics: `applied_moves`, `rejected_moves`, `segment_applied_moves`, `segment_rejected_moves`, `highest_tile`, `score`, `termination_reason`, `segment_index`, `segment_count`, `record_scope`.
-- **Benchmark & Reporting Reconciliation:**
-  - `benchmark_2048_v3.json` is tied directly to the evaluated game segments (e.g., Seed 42: 281 moves; Seed 100: 80 moves; Seed 2026: 235 moves; Seed 7: 312 moves; Seed 13: 152 moves), with full preservation of source-log metrics.
-  - `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md` explicitly tag `record_scope` (`"evaluated_game_segment"` vs `"single_game"`) and present both segment moves and whole-log moves.
-  - Holdout seeds `[99, 123, 777]` verified as single-pass runs (`segment_count = 1`, 0 rejections).
-- **Test Suite & Cryptographic Audit:**
-  - **237 unit tests** passing in ~3.92s, 100% pass rate (4 new regression tests) [PASS].
-  - **31 / 31 (100.0%) SHA-256 hash chains independently verified valid** [PASS].
-  - Zero original `.jsonl` audit logs modified, truncated, or rehashed.
-  - Zero live Arena competition calls made or consumed during this task.
-  - Benchmark data is fully reconciled and verified ready for M7 live session.
+Following the successful 5-move mock 2048 dry-run audit, the reporting layer was audited and hardened:
+1. **Trace `--mock-model` Path & Network Isolation:**
+   - Traced execution path: `--mock-model` in dry-run mode routes strictly through in-memory `make_mock_decide_fn` and `Deterministic2048Simulator` (or `MockSnakeArena`).
+   - Verified zero external model downloads, weights initialization, or inference calls (`LayaAdapter` not instantiated).
+   - Verified zero remote Arena HTTP/network calls (`ArenaClient` not instantiated).
+   - `make_mock_decide_fn` now assigns `"source": "mock"`, and `PERMITTED_SOURCES` in `zenith/decision_validator.py` allows `"mock"`.
+   - Every move in JSONL and terminal viewer explicitly displays `Source: mock`, distinguishing synthetic test decisions from real GPU Laya inference (`source: "laya"`) and deterministic safety fallback (`source: "fallback"`).
+2. **Corrected Terminal-Status Reporting:**
+   - Fixed false `LOST` reporting: A run stopped because `max_moves` was reached is no longer labeled `LOST`. Unless authoritative game state confirms a loss, `won` remains `None` (not `False`), and `status` evaluates to `MOVE_LIMIT_REACHED`.
+   - Added explicit `status` property to `SessionResult` in `zenith/runner.py`, clearly distinguishing:
+     - `WON`: Authoritative game win (`won=True`, e.g. 2048 tile reached).
+     - `LOST`: Authoritative loss (`won=False`, e.g. no valid 2048 moves left or snake collision).
+     - `MOVE_LIMIT_REACHED`: Session safely stopped at `max_moves` threshold without loss.
+     - `NO_PROGRESS_STOPPED`: Session stopped by authoritative board-state progress guard.
+     - `API_ERROR_STOPPED`: Session stopped due to API/network error without retries.
+     - `REJECTION_LIMIT_STOPPED`: Session stopped due to consecutive move rejections.
+   - Updated `DecisionViewer.show_summary` and `zenith/main.py` completion banner to display normalized `result.status` and `Won: N/A` on move limit.
+3. **Comprehensive Verification & Integrity:**
+   - Added 17 focused unit tests in `tests/test_mock_attribution_and_status.py` and 1 in `tests/test_decision_validator.py`.
+   - **266 unit tests passing** (100% pass rate) [PASS].
+   - Verified 100% of repository JSONL audit logs and SHA-256 hash chains remain valid and intact [PASS].
+   - Re-verified dry run: `.\.venv\Scripts\python.exe -m zenith.main --game 2048 --mock-model --max-moves 5 --max-no-progress 1` outputs `Source: mock`, `Result Status: MOVE_LIMIT_REACHED`, and `Won: N/A`.
+   - **NON-NEGOTIABLE STATUS: Existing session `f9d920cd-2924-4024-b01b-1d21304b8d4a` has NOT been resumed, and no live Arena session was created or contacted.**
 
-## Files created / changed in Task M6D
+## Files created / changed in Task M7 Hotfix Reporting Audit
+
+- `zenith/decision_validator.py` (added `"mock"` to `PERMITTED_SOURCES` and `FallbackTracker.record_move`)
+- `zenith/game2048_simulator.py` (included `termination_reason` in response; set `won=None` on `max_moves_reached`)
+- `zenith/snake_simulator.py` (included `termination_reason` in response; set `won=None` on `max_moves_reached`)
+- `zenith/main.py` (`make_mock_decide_fn` sets `source="mock"`; `MockSnakeArena` records `termination_reason` without false loss; passed `max_moves` to runner; banner displays `result.status`)
+- `zenith/runner.py` (added `termination_reason` and `status` property to `SessionResult`; added `max_moves` safeguard; pass `status` to viewer)
+- `zenith/decision_viewer.py` (accepted and displayed `status` in `show_summary`; shows `Won: N/A` when `won is None`)
+- `tests/test_decision_validator.py` (added `test_valid_mock_decision`)
+- `tests/test_mock_attribution_and_status.py` (created new test suite with 17 focused unit tests)
+- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (updated status, files, and verification metrics)
 
 - `zenith/benchmark.py` (added `split_records_into_segments`, updated `Benchmark2048RunResult` and `generate_2048_benchmark_from_logs` with distinct whole-log vs segment fields, updated markdown formatter)
 - `zenith/aggregator.py` (added `record_scope` and source log tracking to `SUMMARY_FIELDNAMES` and `parse_jsonl_session`, updated `generate_benchmark_report_md` to display both segment and whole-log metrics)
@@ -125,3 +141,5 @@ Task M6D validated that ZENITH's consolidated benchmark history strictly disting
 - **2026-10-17 | Task M6B 2048 Strategic Prompt Optimization (v3) Completed:** Analyzed v2 decision traces (center-cell congestion trap). Implemented v3 prompt with corner-anchor preservation, spatial positioning helper `_describe_2048_tile_position`, verifiable immediate consequence criteria. Evaluated standard 5 seeds: Seed 7 reached tile **512** (4,588 pts), 80% reached >= 256, avg tile 268.8 (+90.9% over v2). Evaluated 3 holdout seeds: Seed 99 reached tile **512** (5,812 pts, 413 moves, 0 rejections). Added 4 unit tests (232 total tests passing [PASS]). Re-aggregated 31 runs with 100% valid SHA-256 hash chains [PASS]. Zero live Arena calls made.
 - **2026-10-17 | Task M6C 2048 v3 Benchmark Integrity Audit Completed:** Audited raw v3 logs against final payloads, benchmark summaries, and aggregator tables. Reconciled seed 13 discrepancy (raw log has 18 total rejections, 9 in segment 2; removed prior hardcoded assignment of 10). Built `generate_2048_benchmark_from_logs` in `zenith/benchmark.py` and updated `zenith/aggregator.py` to derive counts directly from source JSONL records. Added unit test in `tests/test_benchmark.py` (233 total tests passing [PASS]). Regenerated `benchmark_2048_v3.json` and consolidated reports with 100% mutual consistency and valid hash chains.
 - **2026-10-17 | Task M6D Final Benchmark Segment Integrity Check Completed:** Validated that consolidated benchmark history distinguishes complete source logs from evaluated game segments. Added `split_records_into_segments`, `record_scope`, and source vs segment metrics across `zenith/benchmark.py` and `zenith/aggregator.py`. Reconciled `benchmark_2048_v3.json` with evaluated segment metrics (Seed 42: 281 moves, Seed 100: 80 moves, Seed 2026: 235 moves, Seed 7: 312 moves, Seed 13: 152 moves). Added 4 regression tests (237 total tests passing [PASS]). Re-aggregated run history; verified 31/31 SHA-256 hash chains valid [PASS]. Verified ready for M7 live session.
+- **2026-10-17 | Task M7 Hotfix 2048 No-Progress Loop Guard Completed:** Investigated official session `f9d920cd-2924-4024-b01b-1d21304b8d4a` (frozen board state at step 221; Arena returned HTTP 200 without mutating board, runner logged 163 duplicate moves before network timeout). Added authoritative state progress guard in `zenith/runner.py` (`normalize_2048_grid`, `check_state_progress`). Differentiates 5 outcomes (terminal, rejected, applied progress, no-progress transition, API error). Stops safely after confirmed no-progress transition (`max_consecutive_no_progress=1`) without action substitution or invention. Removed automatic action submission retries. Added `"no_progress"` to `VALID_RESULTS` and wired viewer/CLI. Added 12 unit tests in `tests/test_runner.py` (249 total tests passing [PASS]). Preserved original logs and hash chains intact. Verified existing session was NOT resumed.
+- **2026-10-17 | Task M7 Hotfix Reporting Audit Completed:** Audited reporting after 5-move mock 2048 dry-run. Verified `--mock-model` makes zero external model or Arena requests. Labeled synthetic decisions with `"source": "mock"` (allowed in `PERMITTED_SOURCES` and `FallbackTracker`), distinguishing mock tests from competition Laya inference (`"source": "laya"`). Corrected false `LOST` reporting: reaching `max_moves` evaluates to `status="MOVE_LIMIT_REACHED"` with `Won: N/A` unless authoritative state confirms a loss. Added explicit `status` property to `SessionResult` distinguishing `WON`, `LOST`, `MOVE_LIMIT_REACHED`, `NO_PROGRESS_STOPPED`, `API_ERROR_STOPPED`, `REJECTION_LIMIT_STOPPED`. Added 17 unit tests in `tests/test_mock_attribution_and_status.py` and 1 in `tests/test_decision_validator.py` (266 total tests passing [PASS]). Preserved all raw logs and hash chains intact. Zero live Arena calls made.

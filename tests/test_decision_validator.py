@@ -56,6 +56,13 @@ class TestDecisionValidator(unittest.TestCase):
         validated = validate_decision(decision, action="up")
         self.assertEqual(validated["source"], "fallback")
 
+    def test_valid_mock_decision(self):
+        """A synthetic mock decision must pass validation with source='mock'."""
+        decision = self._get_valid_decision()
+        decision["source"] = "mock"
+        validated = validate_decision(decision, action="up")
+        self.assertEqual(validated["source"], "mock")
+
     def test_non_dict_decision_rejected(self):
         """Non-dictionary decision must be rejected."""
         with self.assertRaises(DecisionValidationError):

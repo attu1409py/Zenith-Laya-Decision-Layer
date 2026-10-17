@@ -97,6 +97,7 @@ class MockSnakeArena:
             "done": self._done,
             "score": self._score,
             "won": self._won,
+            "termination_reason": getattr(self, "_termination_reason", None),
         }
 
     def create_session(self, game: str, agent_name: str) -> Dict[str, Any]:
@@ -174,7 +175,8 @@ class MockSnakeArena:
 
         if self._move_count >= self._max_moves:
             self._done = True
-            self._won = self._score > 0
+            self._won = True if self._food_eaten >= 10 else None
+            self._termination_reason = "max_moves_reached"
 
         resp = self._build_state()
         resp["result"] = "applied"
@@ -215,7 +217,7 @@ def make_mock_decide_fn() -> DecideFn:
             "probabilities": probs,
             "chosen": chosen,
             "confidence": probs[chosen],
-            "source": "laya",
+            "source": "mock",
         }
 
     return _mock_decide
@@ -349,6 +351,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=5,
         help="Stop after this many consecutive errors (default: 5).",
+    )
+    parser.add_argument(
+        "--max-no-progress",
+        type=int,
+        default=1,
+        help="Stop after this many consecutive no-progress transitions (default: 1).",
     )
     parser.add_argument(
         "--prompt-version",
@@ -486,6 +494,8 @@ def run_cli(
         logger=logger,
         viewer=viewer,
         max_consecutive_errors=args.max_consecutive_errors,
+        max_consecutive_no_progress=args.max_no_progress,
+        max_moves=args.max_moves,
     )
 
     # ── Step 4: Execute Session Loop ──
@@ -513,10 +523,11 @@ def run_cli(
         f" Mode:                 {'LIVE (Official Arena)' if is_live else 'DRY-RUN (Simulated Arena)'}\n"
         f" Model / Identity:     {model_display}\n"
         f" Final Score:          {result.final_score}\n"
-        f" Result Status:        {'WON' if result.won else ('LOST' if result.won is False else 'COMPLETE')}\n"
+        f" Result Status:        {result.status}\n"
         f" Total Moves:          {result.total_moves}\n"
         f" Applied Moves:        {result.applied_moves}\n"
         f" Rejected Moves:       {result.rejected_moves}\n"
+        f" No-Progress Moves:    {result.no_progress_moves}\n"
         f" Fallback Moves:       {result.fallback_moves}\n"
         f" Session Duration:     {result.total_time_ms} ms\n"
         f" Output JSONL Log:     {result.log_path}\n"

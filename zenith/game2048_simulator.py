@@ -323,7 +323,7 @@ class Deterministic2048Simulator:
 
     def _build_response(self, result: str = "applied") -> Dict[str, Any]:
         """Build standard Arena API response dictionary for 2048."""
-        return {
+        resp = {
             "session_id": self._session_id,
             "game": "2048",
             "agent_name": self._agent_name,
@@ -338,6 +338,9 @@ class Deterministic2048Simulator:
             "steps": self._accepted_moves,
             "result": result,
         }
+        if self._termination_reason:
+            resp["termination_reason"] = self._termination_reason
+        return resp
 
     # ── ArenaAdapter Protocol ──────────────────────────────────────────
 
@@ -407,7 +410,7 @@ class Deterministic2048Simulator:
         elif self._accepted_moves >= self._max_moves:
             self._done = True
             if self._won is None:
-                self._won = self._best >= 2048
+                self._won = True if self._best >= 2048 else None
             self._termination_reason = "max_moves_reached"
 
         return self._build_response(result="applied")
