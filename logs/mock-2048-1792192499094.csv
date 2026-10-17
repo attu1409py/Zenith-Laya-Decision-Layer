@@ -1,0 +1,3 @@
+﻿step,action,result,chosen,confidence,source,decide_ms,api_ms,turn_ms,prob_up,prob_down,prob_left,prob_right,hash,prev_hash,ts
+1,left,applied,left,0.8500,laya,0,0,0,0.0500,0.0500,0.8500,0.0500,8e48b8a4629c2199bb23fffdcd0fc028bda4edbc3d359dbef686ec6927e7a23a,GENESIS-mock-2048-1792192499094,2026-10-16T23:14:59Z
+2,left,applied,left,0.8500,laya,0,0,0,0.0500,0.0500,0.8500,0.0500,c7dc623ed02b7a3a515a53031c221f69df6981bf25eb125f1b0cfa0e865dcbcb,8e48b8a4629c2199bb23fffdcd0fc028bda4edbc3d359dbef686ec6927e7a23a,2026-10-16T23:14:59Z

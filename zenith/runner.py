@@ -29,6 +29,7 @@ from zenith.decision_validator import (
     validate_decision,
 )
 from zenith.decision_viewer import DecisionViewer
+from zenith.goals import evaluate_stage_goal
 from zenith.session_logger import MonotonicStopwatch, SessionLogger
 
 
@@ -81,6 +82,10 @@ class SessionResult:
     game: str
     final_score: Optional[int] = None
     won: Optional[bool] = None
+    outcome: Optional[str] = None
+    goal_reached: Optional[bool] = None
+    goal_progress: Optional[str] = None
+    completion_reason: Optional[str] = None
     total_moves: int = 0
     applied_moves: int = 0
     rejected_moves: int = 0
@@ -125,7 +130,7 @@ class SessionRunner:
     The runner:
     1. Creates a session via the arena adapter.
     2. Enters a loop: get state -> call decide_fn -> validate -> submit action.
-    3. Logs every move (applied and rejected) via SessionLogger.
+    3. Logs every move (applied, rejected, no_progress) via SessionLogger.
     4. Updates the DecisionViewer after each move.
     5. Tracks fallback compliance via FallbackTracker.
     6. Saves the final response and verifies the hash chain on completion.
@@ -143,6 +148,8 @@ class SessionRunner:
         max_consecutive_rejections: int = 10,
         max_consecutive_no_progress: int = 1,
         max_moves: Optional[int] = None,
+        on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_complete: Optional[Callable[[SessionResult], None]] = None,
     ):
         """Initialize the session runner.
 
@@ -156,6 +163,8 @@ class SessionRunner:
             max_consecutive_rejections: Stop after this many consecutive rejected moves.
             max_consecutive_no_progress: Stop after this many consecutive no-progress transitions.
             max_moves: Optional maximum applied moves before stopping session safely.
+            on_step: Optional callback invoked on each step.
+            on_complete: Optional callback invoked when session completes.
         """
         self._arena = arena
         self._decide_fn = decide_fn
@@ -166,18 +175,19 @@ class SessionRunner:
         self._max_consecutive_rejections = max_consecutive_rejections
         self._max_consecutive_no_progress = max_consecutive_no_progress
         self._max_moves = max_moves
+        self._on_step = on_step
+        self._on_complete = on_complete
+        self._stop_requested = False
+
+    def stop(self) -> None:
+        """Signal the session runner loop to stop gracefully after current step."""
+        self._stop_requested = True
+
 
     def run(self, initial_session_data: Optional[Dict[str, Any]] = None) -> SessionResult:
-        """Execute the game session loop and return the result.
-
-        Args:
-            initial_session_data: Optional initial session dict from create_session.
-                If provided, avoids an immediate duplicate get_session network call.
-
-        Returns:
-            SessionResult with full session outcome.
-        """
+        """Run the full session loop until the game concludes or stops."""
         session_watch = MonotonicStopwatch()
+
         game = self._logger.game
         session_id = self._logger.session_id
         result = SessionResult(session_id=session_id, game=game)
@@ -202,7 +212,14 @@ class SessionRunner:
                 result.termination_reason = "api_error_stopped"
                 return result
 
+        last_progress_str = ""
+
         while not done:
+            if self._stop_requested:
+                if not result.termination_reason:
+                    result.termination_reason = "stopped_by_user"
+                break
+
             turn_watch = MonotonicStopwatch()
 
             # Extract current state from session data
@@ -337,10 +354,23 @@ class SessionRunner:
             if source == "fallback":
                 result.fallback_moves += 1
 
+            # ── Goal check ──
+            goal_eval = evaluate_stage_goal(game, state_after)
+            goal_reached = goal_eval["reached"]
+            goal_prog_str = goal_eval["progress_text"]
+            last_progress_str = goal_prog_str
+            if goal_reached:
+                done = True
+                won = True
+                if not result.termination_reason:
+                    result.termination_reason = "goal_reached"
+                stop_after_logging = True
+
             # ── Log ──
             log_step = step if move_result == "applied" else step + 1
+            logged_record: Dict[str, Any] = {}
             try:
-                self._logger.log_move(
+                logged_record = self._logger.log_move(
                     step=log_step,
                     state_before=dict(state_before),
                     action=action,
@@ -380,6 +410,34 @@ class SessionRunner:
                 won=won,
             )
 
+            # ── Broadcast UI step callback ──
+            if self._on_step is not None:
+                try:
+                    self._on_step({
+                        "session_id": session_id,
+                        "game": game,
+                        "step": step,
+                        "action": action,
+                        "result": move_result,
+                        "state_before": dict(state_before),
+                        "state_after": dict(state_after),
+                        "decision": dict(validated_decision),
+                        "timing": dict(timing),
+                        "score": new_score,
+                        "done": done,
+                        "won": won,
+                        "hash": logged_record.get("hash"),
+                        "prev_hash": logged_record.get("prev_hash"),
+                        "ts": logged_record.get("ts"),
+                        "total_moves": result.total_moves,
+                        "applied_moves": result.applied_moves,
+                        "rejected_moves": result.rejected_moves,
+                        "fallback_moves": result.fallback_moves,
+                        "fallback_pct": (result.fallback_moves / result.total_moves * 100.0) if result.total_moves > 0 else 0.0,
+                    })
+                except Exception:
+                    pass
+
             # Update session_data for next iteration
             session_data = response
 
@@ -393,14 +451,51 @@ class SessionRunner:
 
         # ── Session complete ──
         result.final_score = session_data.get("score")
-        result.won = session_data.get("won")
+        if result.termination_reason == "goal_reached":
+            result.won = True
+        elif result.termination_reason == "max_moves_reached":
+            result.won = session_data.get("won")
+            if result.won is not True:
+                result.won = None
+        else:
+            result.won = session_data.get("won")
+
         result.total_time_ms = session_watch.elapsed_ms()
         if not result.termination_reason and "termination_reason" in session_data:
             result.termination_reason = session_data.get("termination_reason")
 
-        # Save final response
+        # Determine authoritative outcome and goal status
+        if result.termination_reason == "goal_reached" or result.won is True:
+            result.outcome = "GOAL REACHED"
+            result.goal_reached = True
+            result.completion_reason = f"STAGE COMPLETE // GOAL REACHED ({last_progress_str})"
+        elif result.termination_reason == "max_moves_reached":
+            result.outcome = "MAX MOVES REACHED"
+            result.goal_reached = False
+            result.completion_reason = f"Max moves limit ({self._max_moves}) reached before goal ({last_progress_str})"
+        elif result.termination_reason == "stopped_by_user":
+            result.outcome = "STOPPED BY USER"
+            result.goal_reached = False
+            result.completion_reason = f"Session stopped by operator ({last_progress_str})"
+        elif result.won is False or done:
+            result.outcome = "GAME OVER"
+            result.goal_reached = False
+            result.completion_reason = f"Game over ({last_progress_str})"
+        else:
+            result.outcome = result.status
+            result.goal_reached = False
+            result.completion_reason = f"Session completed ({last_progress_str})"
+        result.goal_progress = last_progress_str
+
+        # Save final response with outcome metadata (separate from per-move JSONL log)
         try:
-            self._logger.save_final_response(session_data)
+            final_payload = dict(session_data)
+            final_payload["outcome"] = result.outcome
+            final_payload["goal_reached"] = result.goal_reached
+            final_payload["goal_progress"] = result.goal_progress
+            final_payload["completion_reason"] = result.completion_reason
+            final_payload["status"] = result.status
+            self._logger.save_final_response(final_payload)
         except Exception:
             pass  # Best-effort; the JSONL log is the primary artifact
 
@@ -420,20 +515,24 @@ class SessionRunner:
             status=result.status,
         )
 
+        if self._on_complete is not None:
+            try:
+                self._on_complete(result)
+            except Exception:
+                pass
+
         return result
 
 
 def _extract_state(session_data: Mapping[str, Any]) -> Dict[str, Any]:
-    """Extract the game state sub-dict from a session response.
-
-    The Arena API may return state at top level or nested under a 'state' key.
-    This helper handles both formats.
-    """
+    """Extract game state dictionary from raw arena session response."""
+    # TopGameAI Arena returns game state nested under 'state'
     if "state" in session_data and isinstance(session_data["state"], dict):
         return dict(session_data["state"])
-    # If no nested 'state', return a copy of the full response as the state
+
+    # If already a flat state dict, return all game-related keys
     # (excluding metadata fields)
-    excluded = {"session_id", "done", "won", "result", "score", "game", "agent_name"}
+    excluded = {"session_id", "done", "won", "result", "score", "game", "agent_name", "termination_reason"}
     return {k: v for k, v in session_data.items() if k not in excluded}
 
 

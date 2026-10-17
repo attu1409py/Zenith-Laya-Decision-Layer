@@ -1,0 +1,4 @@
+﻿step,action,result,chosen,confidence,source,decide_ms,api_ms,turn_ms,prob_up,prob_down,prob_left,prob_right,hash,prev_hash,ts
+1,up,applied,up,0.8500,laya,0,0,0,0.8500,0.0500,0.0500,0.0500,a84f8d4104fe82e3d1ddda21b705be23a1ee06f4a65d04f49e8bf69a60b8abd8,GENESIS-mock-snake-1792192471497,2026-10-16T23:14:31Z
+2,up,applied,up,0.8500,laya,0,0,0,0.8500,0.0500,0.0500,0.0500,070e142717f3a44e0bac2e2bc08e1a8589c6675dd5b8fcddb2e5b857c876eabd,a84f8d4104fe82e3d1ddda21b705be23a1ee06f4a65d04f49e8bf69a60b8abd8,2026-10-16T23:14:31Z
+3,up,applied,up,0.8500,laya,0,0,0,0.8500,0.0500,0.0500,0.0500,d615b26bfbac8aabe66cd75ab187dfe34cb19600f33fa022b671b6cf2ec7cbab,070e142717f3a44e0bac2e2bc08e1a8589c6675dd5b8fcddb2e5b857c876eabd,2026-10-16T23:14:31Z

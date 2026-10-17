@@ -173,9 +173,13 @@ class MockSnakeArena:
         else:
             self._snake.pop()
 
+        if self._food_eaten >= 15:
+            self._done = True
+            self._won = True
+
         if self._move_count >= self._max_moves:
             self._done = True
-            self._won = True if self._food_eaten >= 10 else None
+            self._won = True if self._food_eaten >= 15 else None
             self._termination_reason = "max_moves_reached"
 
         resp = self._build_state()
@@ -207,8 +211,47 @@ def make_mock_decide_fn() -> DecideFn:
                 f"Given {game} state with head at {state.get('snake', [{}])[0] if isinstance(state.get('snake'), list) and state.get('snake') else 'unknown'}, "
                 "which direction should the snake move?"
             )
-            direction = str(state.get("direction", "up")).lower()
-            chosen = direction if direction in VALID_DIRECTIONS else "up"
+            snake = state.get("snake") or []
+            food = state.get("food") or {}
+            width = state.get("width", 12)
+            height = state.get("height", 12)
+            current_dir = str(state.get("direction", "up")).lower()
+
+            opposites = {"up": "down", "down": "up", "left": "right", "right": "left"}
+            forbidden = opposites.get(current_dir)
+
+            if isinstance(snake, list) and len(snake) > 0 and isinstance(food, dict) and "x" in food and "y" in food:
+                head = snake[0]
+                hx, hy = head.get("x", 0), head.get("y", 0)
+                fx, fy = food.get("x", 0), food.get("y", 0)
+                body_set = {(seg.get("x"), seg.get("y")) for seg in snake[:-1] if isinstance(seg, dict)}
+
+                moves = {
+                    "up": (hx, hy - 1),
+                    "down": (hx, hy + 1),
+                    "left": (hx - 1, hy),
+                    "right": (hx + 1, hy),
+                }
+
+                safe_candidates = []
+                for d, (nx, ny) in moves.items():
+                    if d == forbidden:
+                        continue
+                    if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in body_set:
+                        dist = abs(nx - fx) + abs(ny - fy)
+                        safe_candidates.append((dist, d))
+
+                if safe_candidates:
+                    safe_candidates.sort(key=lambda item: item[0])
+                    chosen = safe_candidates[0][1]
+                else:
+                    fallback_candidates = [
+                        d for d, (nx, ny) in moves.items()
+                        if d != forbidden and 0 <= nx < width and 0 <= ny < height
+                    ]
+                    chosen = fallback_candidates[0] if fallback_candidates else (current_dir if current_dir in VALID_DIRECTIONS else "up")
+            else:
+                chosen = current_dir if current_dir in VALID_DIRECTIONS else "up"
 
         probs = {d: 0.05 for d in VALID_DIRECTIONS}
         probs[chosen] = 0.85
@@ -364,6 +407,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["v1", "v2", "v3"],
         help="Prompt strategy version ('v1' baseline, 'v2' revised, 'v3' strategic; default: 'v1').",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Launch the ZENITH decision layer HTTP server and web UI console.",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the web server (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind the web server (default: 8080).",
+    )
     return parser
 
 
@@ -387,6 +446,27 @@ def run_cli(
     """
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+
+    if getattr(args, "serve", False):
+        from zenith.server import ZenithServer
+        stdout.write("\n======================================================================\n")
+        stdout.write("           ZENITH DECISION LAYER - OPERATOR CONSOLE\n")
+        stdout.write("======================================================================\n")
+        stdout.write(f" Team / Agent:      {args.agent_name}\n")
+        stdout.write(f" Arena Endpoint:    {args.base_url}\n")
+        stdout.write(f" Model Mode:        {'MOCK (Dev)' if args.mock_model else 'REAL LAYA'}\n")
+        stdout.write(f" Server URL:        http://{args.host}:{args.port}\n")
+        stdout.write("======================================================================\n")
+        stdout.write("Starting server... Press Ctrl+C to stop.\n\n")
+        stdout.flush()
+        server = ZenithServer(
+            host=args.host,
+            port=args.port,
+            base_url=args.base_url,
+            mock_model=args.mock_model,
+        )
+        server.start(background=False)
+        return 0
 
     is_live = bool(args.live)
     game = args.game.strip().lower()
@@ -512,6 +592,14 @@ def run_cli(
         stderr.write("\n[CRITICAL AUDIT FAILURE] Log file hash chain verification failed!\n")
         return 3
 
+    csv_path = None
+    if result.log_path:
+        try:
+            from zenith.csv_export import export_session_to_csv_file
+            csv_path = export_session_to_csv_file(result.log_path)
+        except Exception:
+            pass
+
     # Display clear summary banner
     stdout.write(
         "\n"
@@ -531,6 +619,7 @@ def run_cli(
         f" Fallback Moves:       {result.fallback_moves}\n"
         f" Session Duration:     {result.total_time_ms} ms\n"
         f" Output JSONL Log:     {result.log_path}\n"
+        f" Output CSV Export:    {csv_path or 'N/A'}\n"
         f" SHA-256 Hash Chain:   {'VERIFIED VALID' if result.hash_chain_valid else 'UNKNOWN'}\n"
         "======================================================================\n"
     )

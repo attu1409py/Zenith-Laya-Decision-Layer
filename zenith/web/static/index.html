@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZENITH // Laya Decision Layer Console</title>
+  <meta name="description" content="Team ZENITH Decision Layer console for TopGameAI Arena (PS 02 Beat the Bot)">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="dark-minimalist">
+  <!-- Top Console Header -->
+  <header class="console-header" id="consoleHeader">
+    <div class="header-left">
+      <div class="brand-group">
+        <span class="brand-name">ZENITH</span>
+        <span class="brand-divider">/</span>
+        <span class="brand-sub">DECISION LAYER <span class="tag-ps">PS-02</span></span>
+      </div>
+      <div class="game-stage-indicator">
+        <span class="stage-tag">ACTIVE STAGE</span>
+        <span class="stage-value" id="currentStageBadge">SNAKE / 2048</span>
+      </div>
+    </div>
+
+    <!-- Independent Link Status Indicators -->
+    <div class="header-center">
+      <!-- Arena Link -->
+      <div class="link-panel" id="arenaLinkPanel" data-status="disconnected">
+        <div class="link-title-row">
+          <span class="link-dot" id="arenaIndicator"></span>
+          <span class="link-title">ARENA LINK</span>
+          <span class="link-endpoint" id="arenaEndpoint">topgameai.com</span>
+        </div>
+        <div class="link-meta-row">
+          <span class="link-status-text" id="arenaStatusText">DISCONNECTED</span>
+          <span class="link-latency" id="arenaLatency">-- ms</span>
+          <span class="link-time" id="arenaLastChecked">--:--:--</span>
+        </div>
+        <div class="link-error-banner" id="arenaErrorBanner" style="display: none;"></div>
+      </div>
+
+      <!-- Laya Link -->
+      <div class="link-panel" id="layaLinkPanel" data-status="disconnected">
+        <div class="link-title-row">
+          <span class="link-dot" id="layaIndicator"></span>
+          <span class="link-title">LAYA RUNTIME</span>
+          <span class="badge-mock" id="layaMockBadge" style="display: none;">MOCK</span>
+          <span class="link-model" id="layaModelId">convaiinnovations/laya</span>
+        </div>
+        <div class="link-meta-row">
+          <span class="link-status-text" id="layaStatusText">DISCONNECTED</span>
+          <span class="link-latency" id="layaLatency">-- ms</span>
+          <span class="link-time" id="layaLastChecked">--:--:--</span>
+        </div>
+        <div class="link-error-banner" id="layaErrorBanner" style="display: none;"></div>
+      </div>
+
+      <!-- Derived Decision Layer Status -->
+      <div class="decision-status-panel" id="decisionStatusPanel" data-status="INACTIVE">
+        <div class="panel-label">LAYER STATUS</div>
+        <div class="decision-status-value" id="decisionStatusValue">INACTIVE</div>
+        <div class="decision-halt-reason" id="decisionHaltReason" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="header-right">
+      <button type="button" class="btn-theme-toggle" id="btnThemeToggle" title="Toggle Light / Dark Theme" aria-label="Toggle Light / Dark Theme">
+        <!-- SVG Sun (visible in dark mode) -->
+        <svg class="theme-icon icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <!-- SVG Moon (visible in light mode) -->
+        <svg class="theme-icon icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+      <button type="button" class="btn-tool" id="btnRecheck" title="Trigger immediate safe read-only health check">
+        <span class="tool-icon">⟳</span> RE-CHECK
+      </button>
+      <div class="judge-toggle-group">
+        <label for="judgeModeToggle" class="judge-label">JUDGE MODE</label>
+        <input type="checkbox" id="judgeModeToggle" class="switch-input" aria-label="Toggle high-contrast judge projector mode">
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body Container -->
+  <div class="console-body">
+    <!-- Left Sidebar: Session Controls -->
+    <aside class="control-rack" id="controlRack">
+      <div class="rack-section">
+        <div class="rack-header">SESSION CONTROLS</div>
+        
+        <div class="control-field">
+          <label for="gameSelect">GAME TARGET</label>
+          <select id="gameSelect" class="form-control">
+            <option value="snake" selected>Stage 1: Snake</option>
+            <option value="2048">Stage 2: 2048</option>
+          </select>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="sessionModeSelect">EXECUTION MODE</label>
+          <select id="sessionModeSelect" class="form-control">
+            <option value="dry-run" selected>Dry-Run (Simulated)</option>
+            <option value="live">Live Official Arena (Judged)</option>
+          </select>
+          <div class="field-hint" id="modeHint">Simulated Arena: Safe local loop, zero network calls to competition servers.</div>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="modelModeSelect">DECISION PROVIDER</label>
+          <select id="modelModeSelect" class="form-control">
+            <option value="mock">Synthetic Model (Dev Mock)</option>
+            <option value="real">Real Laya Weights (Local/GPU)</option>
+          </select>
+        </div>
+
+        <div class="control-field dev-control" id="promptVersionGroup">
+          <label for="promptVersionSelect">PROMPT STRATEGY</label>
+          <select id="promptVersionSelect" class="form-control">
+            <option value="v1" selected>v1: Baseline</option>
+            <option value="v2">v2: Revised</option>
+            <option value="v3">v3: Strategic</option>
+          </select>
+        </div>
+
+        <div class="control-field dev-control">
+          <label for="maxMovesInput">MAX MOVES (DRY-RUN ONLY)</label>
+          <input type="number" id="maxMovesInput" class="form-control" value="15" min="1" max="2000">
+        </div>
+
+        <div class="rack-actions">
+          <button type="button" class="btn-action btn-start" id="btnStartSession" disabled title="Start disabled until BOTH Arena and Laya links are CONNECTED (status: READY)">
+            START SESSION
+          </button>
+          <button type="button" class="btn-action btn-stop" id="btnStopSession" disabled>
+            STOP SESSION
+          </button>
+        </div>
+
+        <div class="readiness-hint" id="readinessHint">
+          Waiting for Arena and Laya links to reach READY status.
+        </div>
+
+        <!-- Current Session Summary Block -->
+        <div class="current-session-box" id="currentSessionBox">
+          <div class="current-session-title mono">CURRENT SESSION</div>
+          <div class="current-session-grid mono">
+            <div class="cs-row">
+              <span class="cs-label">STAGE</span>
+              <span class="cs-val" id="csStage">SNAKE</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">MODE</span>
+              <span class="cs-val" id="csMode">DRY-RUN</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">PROVIDER</span>
+              <span class="cs-val" id="csProvider">MOCK</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">STRATEGY</span>
+              <span class="cs-val" id="csStrategy">v1 (Baseline)</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">MAX MOVES</span>
+              <span class="cs-val" id="csMaxMoves">15</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">STATUS</span>
+              <span class="cs-val cs-status-badge idle" id="csStatus">IDLE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="instrument-workspace">
+      <!-- Tab Bar -->
+      <nav class="workspace-tabs" role="tablist">
+        <button type="button" class="tab-button active" id="tabLiveViewer" role="tab" aria-selected="true" data-tab="live">
+          LIVE DECISION VIEWER
+        </button>
+        <button type="button" class="tab-button" id="tabLogs" role="tab" aria-selected="false" data-tab="logs">
+          SESSION LOGS
+        </button>
+      </nav>
+
+      <!-- Workspace Panes -->
+      <div class="tab-content" id="tabContent">
+        <!-- Live Viewer Pane -->
+        <section class="tab-pane active" id="paneLiveViewer" role="tabpanel">
+          <!-- Honest Empty State -->
+          <div class="empty-state-card" id="emptyStateViewer">
+            <div class="empty-title">No session yet. Connect Arena and Laya to begin.</div>
+            <p class="empty-subtitle">
+              The decision layer requires dual active links. Once both link indicators show green and the status transitions to READY, start a session to view live decisions.
+            </p>
+            <div class="diagnostic-checklist">
+              <div class="checklist-item" id="checkItemArena">
+                <span class="check-icon">○</span>
+                <span class="check-label">Arena TopGameAI API Link</span>
+                <span class="check-status" id="checkStatusArena">Checking...</span>
+              </div>
+              <div class="checklist-item" id="checkItemLaya">
+                <span class="check-icon">○</span>
+                <span class="check-label">Laya Decision Model Runtime</span>
+                <span class="check-status" id="checkStatusLaya">Checking...</span>
+              </div>
+              <div class="checklist-item" id="checkItemReady">
+                <span class="check-icon">○</span>
+                <span class="check-label">Decision Layer Derived Status</span>
+                <span class="check-status" id="checkStatusReady">INACTIVE</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Session Viewer Container -->
+          <div class="live-active-container" id="liveActiveContainer" style="display: none;">
+            <!-- Live Header Strip -->
+            <div class="live-status-strip">
+              <div class="live-tag-group">
+                <span class="live-pulse-dot"></span>
+                <span class="live-game-badge" id="liveGameBadge">SNAKE</span>
+                <span class="live-session-tag mono" id="liveSessionIdTag">session-id</span>
+                <span class="live-mode-badge" id="liveModeBadge">DRY-RUN</span>
+              </div>
+              <div class="live-kpis">
+                <div class="kpi-item">
+                  <span class="kpi-label">STEP</span>
+                  <span class="kpi-value mono" id="liveStepCounter">0</span>
+                </div>
+                <div class="kpi-item">
+                  <span class="kpi-label">SCORE</span>
+                  <span class="kpi-value mono" id="liveScoreCounter">0</span>
+                </div>
+                <div class="kpi-item">
+                  <span class="kpi-label">RESULT</span>
+                  <span class="kpi-value badge-applied" id="liveMoveResultBadge">APPLIED</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Goal Progress Strip -->
+            <div class="goal-progress-strip" id="goalProgressStrip">
+              <div class="goal-progress-header mono">
+                <span class="goal-badge">GOAL</span>
+                <span class="goal-progress-text" id="goalProgressText">FOOD 0 / 15</span>
+                <span class="goal-progress-pct mono" id="goalProgressPct">0%</span>
+              </div>
+              <div class="goal-progress-track">
+                <div class="goal-progress-fill" id="goalProgressFill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Two-Column Instrument Grid -->
+            <div class="live-grid-columns">
+              <!-- Left Column: Compact Game Board -->
+              <div class="instrument-box board-box">
+                <div class="box-header">
+                  <span class="box-title">STATE VISUALIZATION</span>
+                  <span class="box-meta mono" id="boardMeta">12x12 GRID</span>
+                </div>
+                
+                <!-- Snake Board Container -->
+                <div class="board-wrapper" id="snakeBoardWrapper">
+                  <div class="snake-grid" id="snakeGrid"></div>
+                </div>
+
+                <!-- 2048 Board Container -->
+                <div class="board-wrapper" id="game2048BoardWrapper" style="display: none;">
+                  <div class="grid-2048" id="grid2048"></div>
+                </div>
+
+                <!-- Board Sub-metrics -->
+                <div class="board-metrics-strip mono" id="boardMetricsStrip">
+                  <span id="boardMetric1">HEAD: (6, 6)</span>
+                  <span class="sep">|</span>
+                  <span id="boardMetric2">DIR: UP</span>
+                  <span class="sep">|</span>
+                  <span id="boardMetric3">FOOD EATEN: 0</span>
+                </div>
+              </div>
+
+              <!-- Right Column: Decision Intelligence & Probabilities -->
+              <div class="instrument-box decision-box">
+                <div class="box-header">
+                  <span class="box-title">LAYA DECISION INSPECTION</span>
+                  <span class="box-meta mono" id="decisionSourceTag">SOURCE: LAYA</span>
+                </div>
+
+                <!-- Exact Question Text -->
+                <div class="question-block">
+                  <div class="sub-label">STRUCTURED PROMPT QUESTION:</div>
+                  <div class="question-text mono" id="liveQuestionText">Awaiting question...</div>
+                </div>
+
+                <!-- Probability Distribution Bars -->
+                <div class="probabilities-container">
+                  <div class="sub-label">PROBABILITY DISTRIBUTION (MUST SUM 0.98 - 1.02):</div>
+                  
+                  <div class="prob-row" id="probRowUp">
+                    <span class="prob-dir mono">UP</span>
+                    <div class="prob-bar-track">
+                      <div class="prob-bar-fill" id="probBarUp" style="width: 0%;"></div>
+                    </div>
+                    <span class="prob-val mono" id="probValUp">0.00%</span>
+                  </div>
+
+                  <div class="prob-row" id="probRowDown">
+                    <span class="prob-dir mono">DOWN</span>
+                    <div class="prob-bar-track">
+                      <div class="prob-bar-fill" id="probBarDown" style="width: 0%;"></div>
+                    </div>
+                    <span class="prob-val mono" id="probValDown">0.00%</span>
+                  </div>
+
+                  <div class="prob-row" id="probRowLeft">
+                    <span class="prob-dir mono">LEFT</span>
+                    <div class="prob-bar-track">
+                      <div class="prob-bar-fill" id="probBarLeft" style="width: 0%;"></div>
+                    </div>
+                    <span class="prob-val mono" id="probValLeft">0.00%</span>
+                  </div>
+
+                  <div class="prob-row" id="probRowRight">
+                    <span class="prob-dir mono">RIGHT</span>
+                    <div class="prob-bar-track">
+                      <div class="prob-bar-fill" id="probBarRight" style="width: 0%;"></div>
+                    </div>
+                    <span class="prob-val mono" id="probValRight">0.00%</span>
+                  </div>
+                </div>
+
+                <!-- Chosen Action and Confidence -->
+                <div class="decision-summary-strip">
+                  <div class="stat-pill">
+                    <span class="p-label">CHOSEN MOVE</span>
+                    <span class="p-value mono" id="liveChosenAction">--</span>
+                  </div>
+                  <div class="stat-pill">
+                    <span class="p-label">CONFIDENCE</span>
+                    <span class="p-value mono" id="liveConfidence">--</span>
+                  </div>
+                  <div class="stat-pill">
+                    <span class="p-label">SOURCE</span>
+                    <span class="p-value mono" id="liveSourceBadge">LAYA</span>
+                  </div>
+                </div>
+
+                <!-- Timing Breakdown -->
+                <div class="timing-strip">
+                  <div class="timing-item mono">
+                    <span class="t-label">DECIDE:</span>
+                    <span class="t-val" id="liveDecideMs">0ms</span>
+                  </div>
+                  <div class="timing-item mono">
+                    <span class="t-label">API:</span>
+                    <span class="t-val" id="liveApiMs">0ms</span>
+                  </div>
+                  <div class="timing-item mono">
+                    <span class="t-label">TURN:</span>
+                    <span class="t-val" id="liveTurnMs">0ms</span>
+                  </div>
+                </div>
+
+                <!-- Fallback Meter -->
+                <div class="fallback-meter-box">
+                  <div class="fallback-label-row">
+                    <span>SAFETY FALLBACK USAGE (RULE: &le; 10.0%)</span>
+                    <span class="mono" id="fallbackMeterText">0/0 (0.0%) [OK]</span>
+                  </div>
+                  <div class="fallback-track">
+                    <div class="fallback-fill" id="fallbackMeterFill" style="width: 0%;"></div>
+                    <div class="fallback-limit-marker" style="left: 10%;" title="10.0% Max Limit"></div>
+                  </div>
+                </div>
+
+                <!-- Prominent Session Result Banner -->
+                <div class="session-outcome-banner" id="sessionOutcomeBanner" style="display: none;">
+                  <div class="outcome-banner-title mono" id="outcomeBannerTitle">STAGE COMPLETE // GOAL REACHED</div>
+                  <div class="outcome-banner-sub mono" id="outcomeBannerSub">FINAL SCORE: 0 &nbsp;|&nbsp; STEPS: 0 &nbsp;|&nbsp; 0 / 15 food</div>
+                </div>
+
+                <!-- End-of-Run Audit Card -->
+                <div class="audit-card" id="liveAuditCard" style="display: none;">
+                  <div class="audit-header">SESSION FINISHED // AUDIT RESULT</div>
+                  <div class="audit-grid mono">
+                    <div>FINAL SCORE: <span id="auditScore">0</span></div>
+                    <div>OUTCOME: <span id="auditOutcome">--</span></div>
+                    <div>GOAL REACHED: <span id="auditGoalReached">--</span></div>
+                    <div>GOAL PROGRESS: <span id="auditGoalProgress">--</span></div>
+                    <div>HASH CHAIN: <span id="auditHashStatus">VERIFYING...</span></div>
+                  </div>
+                  <div class="audit-actions primary-row">
+                    <button type="button" class="btn-audit" id="btnLiveExportCsv">EXPORT CSV</button>
+                    <button type="button" class="btn-audit" id="btnLiveExportPdf">EXPORT PDF</button>
+                    <button type="button" class="btn-audit" id="btnLiveDownloadJsonl">DOWNLOAD .JSONL</button>
+                    <button type="button" class="btn-audit" id="btnLiveVerify">RE-VERIFY CHAIN</button>
+                  </div>
+                  <div class="audit-actions secondary-row">
+                    <button type="button" class="btn-audit btn-secondary-audit" id="btnLivePreviewCsv" title="View / Preview CSV spreadsheet">VIEW / PREVIEW CSV</button>
+                    <button type="button" class="btn-audit btn-secondary-audit" id="btnLiveOpenCsvTab" title="Open raw CSV in a new browser tab">OPEN CSV (NEW TAB) ↗</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Session Logs Pane -->
+        <section class="tab-pane" id="paneLogs" role="tabpanel" style="display: none;">
+          <div class="logs-container">
+            <div class="logs-toolbar">
+              <div class="toolbar-left">
+                <span class="logs-title">SESSION LOG AUDIT</span>
+                <select id="sessionPickerSelect" class="form-control session-picker" title="Select session log to inspect">
+                  <option value="__active__">Active Session</option>
+                </select>
+                <span class="logs-count mono" id="logsRowCount">0 rows</span>
+              </div>
+              <div class="toolbar-center">
+                <input type="text" id="logSearchInput" class="form-control log-search" placeholder="Filter by step #...">
+                <div class="filter-btn-group">
+                  <button type="button" class="btn-filter active" data-filter="all">ALL</button>
+                  <button type="button" class="btn-filter" data-filter="applied">APPLIED</button>
+                  <button type="button" class="btn-filter" data-filter="rejected">REJECTED</button>
+                  <button type="button" class="btn-filter" data-filter="fallback">FALLBACK</button>
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <button type="button" class="btn-tool" id="btnLogsExportCsv" title="Download .csv file to disk">EXPORT CSV</button>
+                <button type="button" class="btn-tool" id="btnLogsPreviewCsv" title="Open and preview CSV text on screen">PREVIEW CSV</button>
+                <button type="button" class="btn-tool" id="btnLogsOpenCsvTab" title="Open raw CSV in a new browser tab">OPEN CSV ↗</button>
+                <button type="button" class="btn-tool" id="btnLogsExportPdf" title="Download audit report as PDF">PDF</button>
+                <button type="button" class="btn-tool" id="btnLogsDownload" title="Download raw JSONL record">.JSONL</button>
+                <button type="button" class="btn-tool" id="btnLogsVerify" title="Verify cryptographic SHA-256 hash chain">VERIFY</button>
+              </div>
+            </div>
+
+            <!-- Virtualized Table Container -->
+            <div class="table-container" id="logsTableContainer">
+              <table class="logs-table" id="logsTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">STEP</th>
+                    <th style="width: 70px;">ACTION</th>
+                    <th style="width: 80px;">RESULT</th>
+                    <th style="width: 70px;">CHOSEN</th>
+                    <th style="width: 90px;">CONFIDENCE</th>
+                    <th style="width: 80px;">SOURCE</th>
+                    <th style="width: 70px;">DECIDE</th>
+                    <th style="width: 70px;">API</th>
+                    <th style="width: 70px;">TURN</th>
+                    <th>HASH (SHA-256)</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <tr class="empty-row"><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">No session logs loaded. Start a session to view real-time audit records.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Verification Status Toast -->
+            <div class="verify-status-bar" id="verifyStatusBar" style="display: none;"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Row Detail Drawer Modal -->
+  <div class="modal-overlay" id="drawerOverlay" style="display: none;">
+    <div class="drawer-panel" id="drawerPanel">
+      <div class="drawer-header">
+        <span class="drawer-title" id="drawerTitle">MOVE STEP DETAILS</span>
+        <button type="button" class="btn-close" id="btnDrawerClose">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-meta-group">
+          <div class="drawer-meta-item">
+            <span class="dm-label">HASH:</span>
+            <span class="dm-val mono" id="drawerHash">--</span>
+            <button type="button" class="btn-copy" id="btnCopyHash" title="Copy full hash">COPY</button>
+          </div>
+          <div class="drawer-meta-item">
+            <span class="dm-label">PREV HASH:</span>
+            <span class="dm-val mono" id="drawerPrevHash">--</span>
+            <button type="button" class="btn-copy" id="btnCopyPrevHash" title="Copy prev hash">COPY</button>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-section-title">DECISION BLOCK</div>
+          <pre class="json-viewer mono" id="drawerDecisionJson"></pre>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-section-title">STATE BEFORE MOVE</div>
+          <pre class="json-viewer mono" id="drawerStateBeforeJson"></pre>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-section-title">STATE AFTER MOVE</div>
+          <pre class="json-viewer mono" id="drawerStateAfterJson"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSV Preview Modal -->
+  <div class="modal-overlay" id="csvPreviewModal" style="display: none;">
+    <div class="drawer-panel" style="width: 1060px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="drawer-header">
+        <span class="drawer-title" id="csvPreviewTitle">SESSION CSV PREVIEW</span>
+        <button type="button" class="btn-close" id="btnCsvModalClose">&times;</button>
+      </div>
+      <div class="drawer-body" style="display: flex; flex-direction: column; overflow: hidden; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span class="mono" id="csvPreviewStats" style="color: var(--text-muted); font-size: 0.72rem; white-space: nowrap;">0 rows</span>
+            <div class="log-filter-group">
+              <button type="button" class="btn-filter active" id="btnCsvViewTable">TABLE VIEW</button>
+              <button type="button" class="btn-filter" id="btnCsvViewRaw">RAW CSV</button>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-tool" id="btnCopyCsvText">COPY CSV</button>
+            <button type="button" class="btn-tool" id="btnOpenCsvTabFromModal">OPEN IN NEW TAB ↗</button>
+            <button type="button" class="btn-tool btn-primary" id="btnDownloadCsvFromModal">DOWNLOAD .CSV</button>
+          </div>
+        </div>
+        <div id="csvTableContainer" style="overflow: auto; max-height: 520px; border: 1px solid var(--border-subtle); border-radius: 2px;">
+          <table class="logs-table mono" id="csvTableView" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+            <thead id="csvTableThead"></thead>
+            <tbody id="csvTableTbody"></tbody>
+          </table>
+        </div>
+        <pre class="json-viewer mono" id="csvPreviewContent" style="display: none; white-space: pre; overflow-x: auto; max-height: 520px; font-size: 0.70rem; line-height: 1.3; margin: 0;"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Status Strip -->
+  <footer class="console-footer">
+    <div class="footer-segment">
+      <span class="f-label">AGENT:</span>
+      <span class="f-val">ZENITH</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">RULE:</span>
+      <span class="f-val">PURE MODEL (NO RL / SEARCH / LOOKAHEAD)</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">FALLBACK LIMIT:</span>
+      <span class="f-val">10.0% MAX</span>
+    </div>
+    <div class="footer-segment">
+      <span class="f-label">AUDIT:</span>
+      <span class="f-val">APPEND-ONLY JSONL + SHA-256 HASH CHAIN</span>
+    </div>
+    <div class="footer-segment footer-right">
+      <span class="f-label">SERVER:</span>
+      <span class="f-val" id="footerServerAddr">127.0.0.1:8080</span>
+      <span class="f-sep">|</span>
+      <span class="f-label">POLL:</span>
+      <span class="f-val" id="footerPollRate">3000ms</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
