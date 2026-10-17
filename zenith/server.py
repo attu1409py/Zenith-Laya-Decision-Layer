@@ -455,9 +455,11 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
                 return
             with open(log_path, "rb") as f:
                 log_bytes = f.read()
+            view_mode = query.get("view", ["download"])[0].lower()
+            disposition = "inline" if view_mode in ("inline", "raw") else "attachment"
             self.send_response(200)
             self.send_header("Content-Type", "application/x-jsonlines; charset=utf-8")
-            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.jsonl"')
+            self.send_header("Content-Disposition", f'{disposition}; filename="{session_id}.jsonl"')
             self.send_header("Content-Length", str(len(log_bytes)))
             self.end_headers()
             self.wfile.write(log_bytes)
@@ -504,9 +506,11 @@ class ZenithRequestHandler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._send_error_json(f"PDF export failed: {exc}", 500)
                 return
+            view_mode = query.get("view", ["download"])[0].lower()
+            disposition = "inline" if view_mode in ("inline", "preview") else "attachment"
             self.send_response(200)
             self.send_header("Content-Type", "application/pdf")
-            self.send_header("Content-Disposition", f'attachment; filename="{session_id}.pdf"')
+            self.send_header("Content-Disposition", f'{disposition}; filename="{session_id}.pdf"')
             self.send_header("Content-Length", str(len(pdf_bytes)))
             self.end_headers()
             self.wfile.write(pdf_bytes)
@@ -706,13 +710,27 @@ class ZenithServer:
         with self._session_lock:
             self._latest_step_data = step_data
         self._broadcast_event("move", step_data)
+        if self._active_session_data and self._active_session_data.get("mode") != "live":
+            # Give operator visual pacing in simulated web sessions so moves are clearly visible
+            pace = float(self._active_session_data.get("step_delay", 0.35))
+            if pace > 0:
+                time.sleep(pace)
 
     def _on_runner_complete(self, res: SessionResult) -> None:
         """Callback invoked by SessionRunner upon completion."""
+        completion_reason = res.completion_reason or "Session completed."
+        outcome = res.outcome or ("GOAL REACHED" if res.won else "GAME OVER")
+        goal_reached = res.goal_reached if res.goal_reached is not None else bool(res.won)
+        goal_progress = res.goal_progress or ""
+
         with self._session_lock:
             if self._active_session_data:
                 self._active_session_data["status"] = "FINISHED" if not res.error else "FAILED"
                 self._active_session_data["ended_at"] = _utc_now_iso()
+                self._active_session_data["completion_reason"] = completion_reason
+                self._active_session_data["outcome"] = outcome
+                self._active_session_data["goal_reached"] = goal_reached
+                self._active_session_data["goal_progress"] = goal_progress
                 self._active_session_data["final_score"] = res.final_score
                 self._active_session_data["won"] = res.won
                 self._active_session_data["hash_chain_valid"] = res.hash_chain_valid
@@ -725,6 +743,10 @@ class ZenithServer:
             self._session_result = {
                 "final_score": res.final_score,
                 "won": res.won,
+                "outcome": outcome,
+                "goal_reached": goal_reached,
+                "goal_progress": goal_progress,
+                "completion_reason": completion_reason,
                 "hash_chain_valid": res.hash_chain_valid,
                 "total_time_ms": res.total_time_ms,
                 "log_path": res.log_path,
@@ -792,6 +814,7 @@ class ZenithServer:
                 decide_fn=decide_fn,
                 logger=logger,
                 viewer=viewer,
+                max_moves=max_moves,
                 on_step=self._on_runner_step,
                 on_complete=self._on_runner_complete,
             )

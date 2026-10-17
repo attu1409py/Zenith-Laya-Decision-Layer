@@ -8,7 +8,7 @@ from __future__ import annotations
 import csv
 import io
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 from zenith.hash_chain import read_jsonl_records
 
@@ -41,6 +41,30 @@ def records_to_csv_text(records: Sequence[Mapping[str, Any]], lineterminator: st
     for rec in records:
         step = rec.get("step")
         if step is None:
+            continue
+        if rec.get("type") == "outcome":
+            outcome = rec.get("outcome", "")
+            goal_reached_str = "YES" if rec.get("goal_reached") else "NO"
+            progress = rec.get("goal_progress", "")
+            res_str = f"GOAL REACHED: {goal_reached_str} ({progress})"
+            writer.writerow([
+                step,
+                outcome,
+                res_str,
+                outcome,
+                "1.0000",
+                "ZENITH_OUTCOME",
+                0,
+                0,
+                0,
+                "0.0000",
+                "0.0000",
+                "0.0000",
+                "0.0000",
+                rec.get("hash", ""),
+                rec.get("prev_hash", ""),
+                rec.get("ts", ""),
+            ])
             continue
         action = rec.get("action", "")
         result = rec.get("result", "")
@@ -92,7 +116,26 @@ def export_session_to_csv(log_path: Union[str, Path]) -> str:
     with open(path, "r", encoding="utf-8") as f:
         lines = [line for line in f if line.strip()]
 
-    records = read_jsonl_records(lines)
+    records = list(read_jsonl_records(lines))
+    final_json_path = path.with_name(f"{path.stem}_final.json")
+    if final_json_path.exists() and not any(r.get("type") == "outcome" for r in records):
+        try:
+            import json
+            with open(final_json_path, "r", encoding="utf-8") as f:
+                final_data = json.load(f)
+            if isinstance(final_data, dict) and "outcome" in final_data:
+                records.append({
+                    "step": len(records) + 1,
+                    "type": "outcome",
+                    "outcome": final_data.get("outcome", ""),
+                    "goal_reached": final_data.get("goal_reached", False),
+                    "goal_progress": final_data.get("goal_progress", ""),
+                    "hash": final_data.get("last_hash", ""),
+                    "prev_hash": "",
+                    "ts": final_data.get("ended_at", ""),
+                })
+        except Exception:
+            pass
     return records_to_csv_text(records)
 
 

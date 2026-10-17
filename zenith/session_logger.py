@@ -34,7 +34,7 @@ from zenith.hash_chain import (
     verify_jsonl_file,
 )
 
-VALID_RESULTS = ("applied", "rejected")
+VALID_RESULTS = ("applied", "rejected", "no_progress")
 VALID_GAMES = ("snake", "2048")
 
 

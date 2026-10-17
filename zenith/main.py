@@ -97,6 +97,7 @@ class MockSnakeArena:
             "done": self._done,
             "score": self._score,
             "won": self._won,
+            "termination_reason": getattr(self, "_termination_reason", None),
         }
 
     def create_session(self, game: str, agent_name: str) -> Dict[str, Any]:
@@ -172,9 +173,14 @@ class MockSnakeArena:
         else:
             self._snake.pop()
 
+        if self._food_eaten >= 15:
+            self._done = True
+            self._won = True
+
         if self._move_count >= self._max_moves:
             self._done = True
-            self._won = self._score > 0
+            self._won = True if self._food_eaten >= 15 else None
+            self._termination_reason = "max_moves_reached"
 
         resp = self._build_state()
         resp["result"] = "applied"
@@ -205,8 +211,47 @@ def make_mock_decide_fn() -> DecideFn:
                 f"Given {game} state with head at {state.get('snake', [{}])[0] if isinstance(state.get('snake'), list) and state.get('snake') else 'unknown'}, "
                 "which direction should the snake move?"
             )
-            direction = str(state.get("direction", "up")).lower()
-            chosen = direction if direction in VALID_DIRECTIONS else "up"
+            snake = state.get("snake") or []
+            food = state.get("food") or {}
+            width = state.get("width", 12)
+            height = state.get("height", 12)
+            current_dir = str(state.get("direction", "up")).lower()
+
+            opposites = {"up": "down", "down": "up", "left": "right", "right": "left"}
+            forbidden = opposites.get(current_dir)
+
+            if isinstance(snake, list) and len(snake) > 0 and isinstance(food, dict) and "x" in food and "y" in food:
+                head = snake[0]
+                hx, hy = head.get("x", 0), head.get("y", 0)
+                fx, fy = food.get("x", 0), food.get("y", 0)
+                body_set = {(seg.get("x"), seg.get("y")) for seg in snake[:-1] if isinstance(seg, dict)}
+
+                moves = {
+                    "up": (hx, hy - 1),
+                    "down": (hx, hy + 1),
+                    "left": (hx - 1, hy),
+                    "right": (hx + 1, hy),
+                }
+
+                safe_candidates = []
+                for d, (nx, ny) in moves.items():
+                    if d == forbidden:
+                        continue
+                    if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in body_set:
+                        dist = abs(nx - fx) + abs(ny - fy)
+                        safe_candidates.append((dist, d))
+
+                if safe_candidates:
+                    safe_candidates.sort(key=lambda item: item[0])
+                    chosen = safe_candidates[0][1]
+                else:
+                    fallback_candidates = [
+                        d for d, (nx, ny) in moves.items()
+                        if d != forbidden and 0 <= nx < width and 0 <= ny < height
+                    ]
+                    chosen = fallback_candidates[0] if fallback_candidates else (current_dir if current_dir in VALID_DIRECTIONS else "up")
+            else:
+                chosen = current_dir if current_dir in VALID_DIRECTIONS else "up"
 
         probs = {d: 0.05 for d in VALID_DIRECTIONS}
         probs[chosen] = 0.85
@@ -215,7 +260,7 @@ def make_mock_decide_fn() -> DecideFn:
             "probabilities": probs,
             "chosen": chosen,
             "confidence": probs[chosen],
-            "source": "laya",
+            "source": "mock",
         }
 
     return _mock_decide
@@ -349,6 +394,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=5,
         help="Stop after this many consecutive errors (default: 5).",
+    )
+    parser.add_argument(
+        "--max-no-progress",
+        type=int,
+        default=1,
+        help="Stop after this many consecutive no-progress transitions (default: 1).",
     )
     parser.add_argument(
         "--prompt-version",
@@ -523,6 +574,8 @@ def run_cli(
         logger=logger,
         viewer=viewer,
         max_consecutive_errors=args.max_consecutive_errors,
+        max_consecutive_no_progress=args.max_no_progress,
+        max_moves=args.max_moves,
     )
 
     # ── Step 4: Execute Session Loop ──
@@ -558,10 +611,11 @@ def run_cli(
         f" Mode:                 {'LIVE (Official Arena)' if is_live else 'DRY-RUN (Simulated Arena)'}\n"
         f" Model / Identity:     {model_display}\n"
         f" Final Score:          {result.final_score}\n"
-        f" Result Status:        {'WON' if result.won else ('LOST' if result.won is False else 'COMPLETE')}\n"
+        f" Result Status:        {result.status}\n"
         f" Total Moves:          {result.total_moves}\n"
         f" Applied Moves:        {result.applied_moves}\n"
         f" Rejected Moves:       {result.rejected_moves}\n"
+        f" No-Progress Moves:    {result.no_progress_moves}\n"
         f" Fallback Moves:       {result.fallback_moves}\n"
         f" Session Duration:     {result.total_time_ms} ms\n"
         f" Output JSONL Log:     {result.log_path}\n"

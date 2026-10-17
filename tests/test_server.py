@@ -225,7 +225,7 @@ class TestZenithServer(unittest.TestCase):
         code, _, csv_data = self._get(f"/api/logs/export-csv?session_id={session_id}")
         self.assertEqual(code, 200)
         self.assertIn(b"step,action,result", csv_data)
-        self.assertIn(b"laya", csv_data)
+        self.assertIn(b"mock", csv_data)
 
         # Test verification endpoint
         code, verify_resp, _ = self._get(f"/api/logs/verify?session_id={session_id}")

@@ -110,7 +110,29 @@
   const liveAuditCard = document.getElementById('liveAuditCard');
   const auditScore = document.getElementById('auditScore');
   const auditOutcome = document.getElementById('auditOutcome');
+  const auditGoalReached = document.getElementById('auditGoalReached');
+  const auditGoalProgress = document.getElementById('auditGoalProgress');
   const auditHashStatus = document.getElementById('auditHashStatus');
+
+  // Theme & Goal Elements
+  const btnThemeToggle = document.getElementById('btnThemeToggle');
+  const goalProgressStrip = document.getElementById('goalProgressStrip');
+  const goalProgressText = document.getElementById('goalProgressText');
+  const goalProgressPct = document.getElementById('goalProgressPct');
+  const goalProgressFill = document.getElementById('goalProgressFill');
+
+  // Outcome Banner Elements
+  const sessionOutcomeBanner = document.getElementById('sessionOutcomeBanner');
+  const outcomeBannerTitle = document.getElementById('outcomeBannerTitle');
+  const outcomeBannerSub = document.getElementById('outcomeBannerSub');
+
+  // Current Session Summary Block Elements
+  const csStage = document.getElementById('csStage');
+  const csMode = document.getElementById('csMode');
+  const csProvider = document.getElementById('csProvider');
+  const csStrategy = document.getElementById('csStrategy');
+  const csMaxMoves = document.getElementById('csMaxMoves');
+  const csStatus = document.getElementById('csStatus');
 
   // Export Buttons
   const btnExportCsv = document.getElementById('btnExportCsv');
@@ -121,14 +143,17 @@
   const btnLiveExportPdf = document.getElementById('btnLiveExportPdf');
   const btnLiveDownloadJsonl = document.getElementById('btnLiveDownloadJsonl');
   const btnLiveVerify = document.getElementById('btnLiveVerify');
+  const btnLivePreviewCsv = document.getElementById('btnLivePreviewCsv');
+  const btnLiveOpenCsvTab = document.getElementById('btnLiveOpenCsvTab');
   const btnLogsExportCsv = document.getElementById('btnLogsExportCsv');
   const btnLogsExportPdf = document.getElementById('btnLogsExportPdf');
   const btnLogsPreviewCsv = document.getElementById('btnLogsPreviewCsv');
   const btnLogsOpenCsvTab = document.getElementById('btnLogsOpenCsvTab');
   const btnLogsDownload = document.getElementById('btnLogsDownload');
-  const btnLogsVerify = document.getElementById('btnLogsVerify');
   const btnPreviewCsvSidebar = document.getElementById('btnPreviewCsvSidebar');
   const btnOpenCsvTabSidebar = document.getElementById('btnOpenCsvTabSidebar');
+  const btnOpenPdfTabSidebar = document.getElementById('btnOpenPdfTabSidebar');
+  const btnOpenJsonlTabSidebar = document.getElementById('btnOpenJsonlTabSidebar');
 
   // CSV Preview Modal Elements
   const csvPreviewModal = document.getElementById('csvPreviewModal');
@@ -192,6 +217,121 @@
     el.classList.remove('flash-update');
     void el.offsetWidth;
     el.classList.add('flash-update');
+  }
+
+  // --- Stage Goals Configuration (Extensible) ---
+  const STAGE_GOALS = {
+    snake: {
+      label: 'FOOD',
+      target: 15,
+      unit: 'food',
+      metricFn: (state) => {
+        let foodEaten = 0;
+        if (state && typeof state.foodEaten === 'number') {
+          foodEaten = state.foodEaten;
+        } else if (state && Array.isArray(state.snake) && state.snake.length >= 3) {
+          foodEaten = state.snake.length - 3;
+        } else if (state && typeof state.score === 'number') {
+          foodEaten = Math.floor(state.score / 100);
+        }
+        foodEaten = Math.max(0, foodEaten);
+        return { current: foodEaten, target: 15, text: `${foodEaten} / 15 food` };
+      },
+      checkFn: (state) => {
+        let foodEaten = 0;
+        if (state && typeof state.foodEaten === 'number') {
+          foodEaten = state.foodEaten;
+        } else if (state && Array.isArray(state.snake) && state.snake.length >= 3) {
+          foodEaten = state.snake.length - 3;
+        } else if (state && typeof state.score === 'number') {
+          foodEaten = Math.floor(state.score / 100);
+        }
+        return foodEaten >= 15;
+      }
+    },
+    '2048': {
+      label: 'TILE',
+      target: 2048,
+      unit: 'tile',
+      metricFn: (state) => {
+        let maxTile = 0;
+        if (state && Array.isArray(state.grid)) {
+          for (const row of state.grid) {
+            if (Array.isArray(row)) {
+              for (const cell of row) {
+                if (typeof cell === 'number' && cell > maxTile) maxTile = cell;
+              }
+            }
+          }
+        }
+        return { current: maxTile, target: 2048, text: `${maxTile} / 2048 tile` };
+      },
+      checkFn: (state) => {
+        let maxTile = 0;
+        if (state && Array.isArray(state.grid)) {
+          for (const row of state.grid) {
+            if (Array.isArray(row)) {
+              for (const cell of row) {
+                if (typeof cell === 'number' && cell > maxTile) maxTile = cell;
+              }
+            }
+          }
+        }
+        return maxTile >= 2048;
+      }
+    }
+  };
+
+  function getStageGoal(game) {
+    const key = String(game || '').toLowerCase().trim();
+    return STAGE_GOALS[key] || null;
+  }
+
+  function evaluateStageGoal(game, state) {
+    const goal = getStageGoal(game);
+    if (!goal) {
+      return {
+        hasGoal: false,
+        label: 'NO GOAL',
+        text: 'No goal defined',
+        current: 0,
+        target: 0,
+        pct: 0,
+        reached: false
+      };
+    }
+    const metric = goal.metricFn(state);
+    const reached = goal.checkFn(state);
+    const pct = Math.min(100, Math.max(0, goal.target > 0 ? (metric.current / goal.target) * 100 : 0));
+    return {
+      hasGoal: true,
+      label: goal.label,
+      text: metric.text,
+      current: metric.current,
+      target: goal.target,
+      pct,
+      reached
+    };
+  }
+
+  // --- Current Session Sidebar Summary ---
+  function updateCurrentSessionSummary(overrides = {}) {
+    const stage = (overrides.stage || (gameSelect ? gameSelect.value : 'snake')).toUpperCase();
+    const mode = (overrides.mode || (sessionModeSelect ? sessionModeSelect.value : 'dry-run')).toUpperCase();
+    const provider = (overrides.provider || (modelModeSelect && modelModeSelect.value === 'real' ? 'REAL LAYA' : 'MOCK')).toUpperCase();
+    const strategy = overrides.strategy || (promptVersionSelect ? promptVersionSelect.value : 'v1');
+    const maxMoves = overrides.maxMoves !== undefined ? overrides.maxMoves : (maxMovesInput ? maxMovesInput.value : '15');
+    const status = (overrides.status || (currentSession ? currentSession.status : 'IDLE')).toUpperCase();
+
+    if (csStage) csStage.textContent = stage;
+    if (csMode) csMode.textContent = mode;
+    if (csProvider) csProvider.textContent = provider;
+    if (csStrategy) csStrategy.textContent = strategy;
+    if (csMaxMoves) csMaxMoves.textContent = maxMoves || '--';
+    if (csStatus) {
+      csStatus.textContent = status;
+      csStatus.className = 'cs-val cs-status-badge ' + status.toLowerCase();
+    }
   }
 
   // --- Board Renderers ---
@@ -368,6 +508,19 @@
     fallbackMeterFill.style.width = `${Math.min(100, fbPct * 5)}%`; // Scaled for visibility up to 20%
     fallbackMeterFill.className = 'fallback-fill ' + (fbPct > 10.0 ? 'exceeded' : (fbPct > 7.0 ? 'warning' : ''));
 
+    // Goal Progress Indicator Update
+    const goalEval = moveData.goal || evaluateStageGoal(game, stateAfter);
+    if (goalProgressText && goalProgressPct && goalProgressFill) {
+      goalProgressText.textContent = `${goalEval.label} ${goalEval.progress_text || goalEval.text || (goalEval.current_value + ' / ' + goalEval.target_value)}`;
+      const pct = Math.round(goalEval.pct !== undefined ? goalEval.pct : 0);
+      goalProgressPct.textContent = `${pct}%`;
+      goalProgressFill.style.width = `${Math.min(100, pct)}%`;
+      goalProgressFill.classList.toggle('reached', Boolean(goalEval.reached));
+    }
+
+    // Update Sidebar Status
+    updateCurrentSessionSummary({ status: 'RUNNING' });
+
     // Append to move records and table
     addRecordToTable(moveData);
   }
@@ -513,6 +666,10 @@
         currentSession = sess;
         moveRecords = [];
         renderLogsTable();
+        // Switch to Live Decision Viewer tab if currently on Session Logs
+        if (paneLogs && paneLogs.style.display !== 'none' && tabLiveViewer) {
+          tabLiveViewer.click();
+        }
         liveAuditCard.style.display = 'none';
         emptyStateViewer.style.display = 'none';
         liveActiveContainer.style.display = 'flex';
@@ -522,6 +679,28 @@
         activeSessionId.textContent = sess.session_id;
         activeSessionMode.textContent = `${(sess.game || '').toUpperCase()} / ${(sess.mode || '').toUpperCase()}`;
         activeSessionChain.textContent = 'BUILDING';
+
+        // Reset Outcome Banner and Goal Progress
+        if (sessionOutcomeBanner) {
+          sessionOutcomeBanner.style.display = 'none';
+          sessionOutcomeBanner.className = 'session-outcome-banner';
+        }
+        const g = getStageGoal(sess.game || 'snake');
+        if (goalProgressText && goalProgressPct && goalProgressFill) {
+          const label = g ? g.label : 'GOAL';
+          const target = g ? g.target : 0;
+          const unit = g ? g.unit : '';
+          goalProgressText.textContent = g ? `${label} 0 / ${target} ${unit}` : 'No goal defined';
+          goalProgressPct.textContent = '0%';
+          goalProgressFill.style.width = '0%';
+          goalProgressFill.classList.remove('reached');
+        }
+
+        updateCurrentSessionSummary({
+          stage: sess.game,
+          mode: sess.mode,
+          status: 'RUNNING',
+        });
       } catch (err) {
         console.warn('Start parse error:', err);
       }
@@ -541,12 +720,51 @@
         const fin = JSON.parse(e.data);
         currentSession = fin;
         liveAuditCard.style.display = 'flex';
-        auditScore.textContent = fin.final_score !== undefined ? String(fin.final_score) : '0';
-        auditOutcome.textContent = fin.won ? 'WON' : (fin.won === false ? 'TERMINATED' : 'FINISHED');
+
+        const outcome = fin.outcome || (fin.won ? 'GOAL REACHED' : (fin.won === false ? 'GAME OVER' : 'FINISHED'));
+        const isGoalReached = outcome === 'GOAL REACHED' || fin.goal_reached === true;
+        const isGameOver = outcome === 'GAME OVER' || (fin.won === false && outcome !== 'MAX MOVES REACHED' && outcome !== 'STOPPED BY USER');
+
+        // Show Prominent Result Banner
+        if (sessionOutcomeBanner) {
+          sessionOutcomeBanner.style.display = 'flex';
+          sessionOutcomeBanner.className = 'session-outcome-banner ' + (isGoalReached ? 'goal-reached' : (isGameOver ? 'game-over' : 'other-outcome'));
+
+          if (isGoalReached) {
+            outcomeBannerTitle.textContent = 'STAGE COMPLETE // GOAL REACHED';
+            outcomeBannerSub.textContent = `FINAL SCORE: ${fin.final_score !== undefined ? fin.final_score : 0}  |  STEPS: ${fin.total_moves || fin.applied_moves || 0}  |  GOAL: ${fin.goal_progress || '15 / 15 food'}`;
+          } else {
+            outcomeBannerTitle.textContent = `STAGE ENDED // ${outcome}`;
+            outcomeBannerSub.textContent = `REASON: ${fin.completion_reason || outcome}  |  PROGRESS: ${fin.goal_progress || '--'}`;
+          }
+        }
+
+        // Populate Audit Panel
+        if (auditScore) auditScore.textContent = fin.final_score !== undefined ? String(fin.final_score) : '0';
+        if (auditOutcome) auditOutcome.textContent = outcome;
+        if (auditGoalReached) auditGoalReached.textContent = isGoalReached ? 'YES' : 'NO';
+        if (auditGoalProgress) auditGoalProgress.textContent = fin.goal_progress || '--';
+
         const valid = fin.hash_chain_valid;
-        auditHashStatus.textContent = valid ? 'VERIFIED VALID (SHA-256)' : (valid === false ? 'FAILED' : 'COMPLETE');
-        auditHashStatus.style.color = valid ? 'var(--status-connected)' : 'var(--status-error)';
-        activeSessionChain.textContent = valid ? 'VERIFIED VALID' : (valid === false ? 'INVALID' : 'COMPLETE');
+        if (auditHashStatus) {
+          auditHashStatus.textContent = valid ? 'VERIFIED VALID (SHA-256)' : (valid === false ? 'FAILED' : 'COMPLETE');
+          auditHashStatus.style.color = valid ? 'var(--status-connected)' : 'var(--status-error)';
+        }
+        if (activeSessionChain) {
+          activeSessionChain.textContent = valid ? 'VERIFIED VALID' : (valid === false ? 'INVALID' : 'COMPLETE');
+        }
+
+        if (liveMoveResultBadge) {
+          liveMoveResultBadge.textContent = outcome;
+          liveMoveResultBadge.className = 'kpi-value ' + (isGoalReached ? 'badge-applied' : 'badge-rejected');
+        }
+
+        updateCurrentSessionSummary({ status: 'FINISHED' });
+
+        // Smoothly scroll the audit card into view so user sees completion & export buttons
+        if (liveAuditCard) {
+          liveAuditCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
         fetchHealth(true);
         fetchSessionList();
       } catch (err) {
@@ -598,15 +816,32 @@
       .replace(/'/g, '&#039;');
   }
 
-  function triggerDirectDownload(url, defaultFilename) {
-    const a = document.createElement('a');
-    a.href = url;
-    if (defaultFilename) a.download = defaultFilename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (a.parentNode) document.body.removeChild(a);
-    }, 300);
+  async function triggerDirectDownload(url, defaultFilename) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      if (defaultFilename) a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    } catch (_) {
+      // Fallback for direct browser download
+      const a = document.createElement('a');
+      a.href = url;
+      if (defaultFilename) a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) document.body.removeChild(a);
+      }, 300);
+    }
   }
 
   function exportCsv() {
@@ -673,24 +908,46 @@
     triggerDirectDownload(`/api/logs/export-pdf?session_id=${encodeURIComponent(sId)}`, `${sId}_audit_report.pdf`);
   }
 
-  btnExportCsv.addEventListener('click', exportCsv);
+  function openPdfTab() {
+    const sId = getActiveSessionId();
+    if (!sId) {
+      alert('No active or previous session selected to view PDF. Please start a session or select one from the session picker.');
+      return;
+    }
+    window.open(`/api/logs/export-pdf?session_id=${encodeURIComponent(sId)}&view=inline`, '_blank');
+  }
+
+  function openJsonlTab() {
+    const sId = getActiveSessionId();
+    if (!sId) {
+      alert('No active or previous session selected to view JSONL. Please start a session or select one from the session picker.');
+      return;
+    }
+    window.open(`/api/logs/download?session_id=${encodeURIComponent(sId)}&view=inline`, '_blank');
+  }
+
+  if (btnExportCsv) btnExportCsv.addEventListener('click', exportCsv);
   if (btnPreviewCsvSidebar) btnPreviewCsvSidebar.addEventListener('click', openCsvPreview);
   if (btnOpenCsvTabSidebar) btnOpenCsvTabSidebar.addEventListener('click', openCsvTab);
   if (btnExportPdf) btnExportPdf.addEventListener('click', exportPdf);
-  btnDownloadJsonl.addEventListener('click', downloadJsonl);
-  btnVerifyChain.addEventListener('click', verifyChain);
+  if (btnOpenPdfTabSidebar) btnOpenPdfTabSidebar.addEventListener('click', openPdfTab);
+  if (btnDownloadJsonl) btnDownloadJsonl.addEventListener('click', downloadJsonl);
+  if (btnOpenJsonlTabSidebar) btnOpenJsonlTabSidebar.addEventListener('click', openJsonlTab);
+  if (btnVerifyChain) btnVerifyChain.addEventListener('click', verifyChain);
 
-  btnLiveExportCsv.addEventListener('click', exportCsv);
+  if (btnLiveExportCsv) btnLiveExportCsv.addEventListener('click', exportCsv);
   if (btnLiveExportPdf) btnLiveExportPdf.addEventListener('click', exportPdf);
-  btnLiveDownloadJsonl.addEventListener('click', downloadJsonl);
-  btnLiveVerify.addEventListener('click', verifyChain);
+  if (btnLiveDownloadJsonl) btnLiveDownloadJsonl.addEventListener('click', downloadJsonl);
+  if (btnLiveVerify) btnLiveVerify.addEventListener('click', verifyChain);
+  if (btnLivePreviewCsv) btnLivePreviewCsv.addEventListener('click', openCsvPreview);
+  if (btnLiveOpenCsvTab) btnLiveOpenCsvTab.addEventListener('click', openCsvTab);
 
-  btnLogsExportCsv.addEventListener('click', exportCsv);
+  if (btnLogsExportCsv) btnLogsExportCsv.addEventListener('click', exportCsv);
   if (btnLogsPreviewCsv) btnLogsPreviewCsv.addEventListener('click', openCsvPreview);
   if (btnLogsOpenCsvTab) btnLogsOpenCsvTab.addEventListener('click', openCsvTab);
   if (btnLogsExportPdf) btnLogsExportPdf.addEventListener('click', exportPdf);
-  btnLogsDownload.addEventListener('click', downloadJsonl);
-  btnLogsVerify.addEventListener('click', verifyChain);
+  if (btnLogsDownload) btnLogsDownload.addEventListener('click', downloadJsonl);
+  if (btnLogsVerify) btnLogsVerify.addEventListener('click', verifyChain);
 
   // CSV Parsing and Spreadsheet Viewer
   function parseCsvRows(text) {
@@ -975,11 +1232,47 @@
         const sess = res.session;
         if (sess) {
           currentSession = sess;
+          if (emptyStateViewer) emptyStateViewer.style.display = 'none';
+          if (liveActiveContainer) liveActiveContainer.style.display = 'flex';
+          if (liveGameBadge) liveGameBadge.textContent = (sess.game || 'snake').toUpperCase();
+          if (liveSessionIdTag) liveSessionIdTag.textContent = sess.session_id || '';
+          if (liveModeBadge) liveModeBadge.textContent = (sess.mode || 'dry-run').toUpperCase();
           activeSessionId.textContent = sess.session_id || 'NONE';
           activeSessionMode.textContent = `${(sess.game || '').toUpperCase()} / ${(sess.mode || '').toUpperCase()}`;
           activeSessionChain.textContent = sess.hash_chain_valid !== undefined ? (sess.hash_chain_valid ? 'VALID' : 'INVALID') : 'PENDING';
+          updateCurrentSessionSummary({
+            stage: sess.game,
+            mode: sess.mode,
+            status: sess.status || 'IDLE',
+          });
           if (res.latest_move) {
             renderLiveMove(res.latest_move);
+          }
+          if (sess.status === 'FINISHED') {
+            liveAuditCard.style.display = 'flex';
+            const outcome = sess.outcome || (sess.won ? 'GOAL REACHED' : 'GAME OVER');
+            const isGoalReached = outcome === 'GOAL REACHED' || sess.goal_reached === true;
+            const isGameOver = outcome === 'GAME OVER' || (sess.won === false && outcome !== 'MAX MOVES REACHED' && outcome !== 'STOPPED BY USER');
+            if (sessionOutcomeBanner) {
+              sessionOutcomeBanner.style.display = 'flex';
+              sessionOutcomeBanner.className = 'session-outcome-banner ' + (isGoalReached ? 'goal-reached' : (isGameOver ? 'game-over' : 'other-outcome'));
+              if (isGoalReached) {
+                outcomeBannerTitle.textContent = 'STAGE COMPLETE // GOAL REACHED';
+                outcomeBannerSub.textContent = `FINAL SCORE: ${sess.final_score !== undefined ? sess.final_score : 0}  |  STEPS: ${sess.total_moves || sess.applied_moves || 0}  |  GOAL: ${sess.goal_progress || '15 / 15 food'}`;
+              } else {
+                outcomeBannerTitle.textContent = `STAGE ENDED // ${outcome}`;
+                outcomeBannerSub.textContent = `REASON: ${sess.completion_reason || outcome}  |  PROGRESS: ${sess.goal_progress || '--'}`;
+              }
+            }
+            if (auditScore) auditScore.textContent = sess.final_score !== undefined ? String(sess.final_score) : '0';
+            if (auditOutcome) auditOutcome.textContent = outcome;
+            if (auditGoalReached) auditGoalReached.textContent = isGoalReached ? 'YES' : 'NO';
+            if (auditGoalProgress) auditGoalProgress.textContent = sess.goal_progress || '--';
+            const valid = sess.hash_chain_valid;
+            if (auditHashStatus) {
+              auditHashStatus.textContent = valid ? 'VERIFIED VALID (SHA-256)' : (valid === false ? 'FAILED' : 'COMPLETE');
+              auditHashStatus.style.color = valid ? 'var(--status-connected)' : 'var(--status-error)';
+            }
           }
         }
       }
@@ -1067,6 +1360,7 @@
       promptVersionGroup.style.display = 'none';
       boardMeta.textContent = '12x12 SNAKE GRID';
     }
+    updateCurrentSessionSummary();
   });
 
   sessionModeSelect.addEventListener('change', () => {
@@ -1077,22 +1371,80 @@
       modeHint.textContent = 'Simulated Arena: Safe local loop, zero network calls to competition servers.';
       modeHint.style.color = 'var(--text-muted)';
     }
+    updateCurrentSessionSummary();
   });
+
+  if (modelModeSelect) modelModeSelect.addEventListener('change', () => updateCurrentSessionSummary());
+  if (promptVersionSelect) promptVersionSelect.addEventListener('change', () => updateCurrentSessionSummary());
+  if (maxMovesInput) maxMovesInput.addEventListener('input', () => updateCurrentSessionSummary());
+
+  // --- Theme Management ---
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.body.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      document.body.removeAttribute('data-theme');
+    }
+    try {
+      localStorage.setItem('zenith_theme', theme);
+    } catch (e) {
+      console.warn('Failed to save theme in localStorage:', e);
+    }
+  }
+
+  function initTheme() {
+    let saved = null;
+    try {
+      saved = localStorage.getItem('zenith_theme');
+    } catch (e) {
+      console.warn('Failed to read theme from localStorage:', e);
+    }
+
+    if (saved === 'light' || saved === 'dark') {
+      applyTheme(saved);
+    } else {
+      const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+      applyTheme(prefersLight ? 'light' : 'dark');
+    }
+
+    if (window.matchMedia) {
+      try {
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+          try {
+            if (!localStorage.getItem('zenith_theme')) {
+              applyTheme(e.matches ? 'light' : 'dark');
+            }
+          } catch (_) {}
+        });
+      } catch (_) {}
+    }
+  }
+
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener('click', () => {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      applyTheme(isLight ? 'dark' : 'light');
+    });
+  }
 
   judgeModeToggle.addEventListener('change', () => {
     if (judgeModeToggle.checked) {
       document.body.classList.add('judge-mode');
-      localStorage.setItem('zenith_judge_mode', '1');
+      try { localStorage.setItem('zenith_judge_mode', '1'); } catch (_) {}
     } else {
       document.body.classList.remove('judge-mode');
-      localStorage.removeItem('zenith_judge_mode');
+      try { localStorage.removeItem('zenith_judge_mode'); } catch (_) {}
     }
   });
 
-  if (localStorage.getItem('zenith_judge_mode') === '1') {
-    judgeModeToggle.checked = true;
-    document.body.classList.add('judge-mode');
-  }
+  try {
+    if (localStorage.getItem('zenith_judge_mode') === '1') {
+      judgeModeToggle.checked = true;
+      document.body.classList.add('judge-mode');
+    }
+  } catch (_) {}
 
   // Tabs
   tabLiveViewer.addEventListener('click', () => {
@@ -1164,7 +1516,9 @@
   }
 
   // --- Initialization ---
+  initTheme();
   initSnakeGrid();
+  updateCurrentSessionSummary();
   fetchHealth(false);
   fetchCurrentSession();
   fetchSessionList();

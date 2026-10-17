@@ -166,6 +166,19 @@ def generate_session_pdf(
     chain_status_str = "VALID (CRYPTOGRAPHIC INTEGRITY CONFIRMED)" if verify_result.is_valid else f"FAILED: {verify_result.error_message}"
     chain_color = colors.HexColor("#10b981") if verify_result.is_valid else colors.HexColor("#ef4444")
 
+    # Check for chained outcome record or companion final response metadata
+    outcome_rec = next((r for r in reversed(records) if r.get("type") == "outcome" or "outcome" in r), None)
+    if outcome_rec is None and hasattr(path, "with_name"):
+        final_json_path = path.with_name(f"{path.stem}_final.json")
+        if final_json_path.exists():
+            try:
+                with open(final_json_path, "r", encoding="utf-8") as f:
+                    final_data = json.load(f)
+                if isinstance(final_data, dict) and "outcome" in final_data:
+                    outcome_rec = final_data
+            except Exception:
+                pass
+
     # Overview Table
     overview_data = [
         [
@@ -193,6 +206,16 @@ def generate_session_pdf(
             Paragraph(f"{avg_turn:.1f} ms (decide: {avg_decide:.1f} ms)", cell_style),
         ],
     ]
+
+    if outcome_rec:
+        goal_status_str = "REACHED" if outcome_rec.get("goal_reached") else "NOT REACHED"
+        goal_color = colors.HexColor("#10b981") if outcome_rec.get("goal_reached") else colors.HexColor("#f59e0b")
+        overview_data.append([
+            Paragraph("<b>Session Outcome:</b>", cell_style),
+            Paragraph(f"<b>{outcome_rec.get('outcome', '')}</b>", cell_style),
+            Paragraph("<b>Goal Status:</b>", cell_style),
+            Paragraph(f"<b>{goal_status_str}</b> ({outcome_rec.get('goal_progress', '')})", ParagraphStyle("GoalStatus", parent=cell_style, textColor=goal_color)),
+        ])
 
     overview_table = Table(overview_data, colWidths=[1.4 * inch, 2.2 * inch, 1.4 * inch, 2.5 * inch])
     overview_table.setStyle(
@@ -227,6 +250,24 @@ def generate_session_pdf(
 
     slice_records = records[:max_table_rows]
     for r in slice_records:
+        if r.get("type") == "outcome":
+            outcome = str(r.get("outcome", ""))
+            goal_reached_str = "YES" if r.get("goal_reached") else "NO"
+            progress = str(r.get("goal_progress", ""))
+            h = str(r.get("hash", ""))
+            short_h = (h[:14] + "..") if len(h) > 16 else h
+            table_data.append([
+                Paragraph(str(r.get("step", "FINAL")), mono_cell),
+                Paragraph(outcome, mono_cell),
+                Paragraph(f"GOAL:{goal_reached_str}", mono_cell),
+                Paragraph(progress, mono_cell),
+                Paragraph("100%", mono_cell),
+                Paragraph("OUTCOME", mono_cell),
+                Paragraph("0ms", mono_cell),
+                Paragraph("0ms", mono_cell),
+                Paragraph(short_h, mono_cell),
+            ])
+            continue
         dec = r.get("decision") or {}
         timing = r.get("timing") or {}
         h = str(r.get("hash", ""))

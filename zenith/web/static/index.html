@@ -68,6 +68,24 @@
 
     <!-- Right Controls -->
     <div class="header-right">
+      <button type="button" class="btn-theme-toggle" id="btnThemeToggle" title="Toggle Light / Dark Theme" aria-label="Toggle Light / Dark Theme">
+        <!-- SVG Sun (visible in dark mode) -->
+        <svg class="theme-icon icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <!-- SVG Moon (visible in light mode) -->
+        <svg class="theme-icon icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
       <button type="button" class="btn-tool" id="btnRecheck" title="Trigger immediate safe read-only health check">
         <span class="tool-icon">⟳</span> RE-CHECK
       </button>
@@ -136,48 +154,36 @@
         <div class="readiness-hint" id="readinessHint">
           Waiting for Arena and Laya links to reach READY status.
         </div>
-      </div>
 
-      <!-- Quick Export Actions Panel -->
-      <div class="rack-section export-rack-section">
-        <div class="rack-header">AUDIT & EXPORT</div>
-        <button type="button" class="btn-export-tool" id="btnExportCsv" title="Download session steps as CSV to disk">
-          EXPORT AS .CSV
-        </button>
-        <button type="button" class="btn-export-tool" id="btnPreviewCsvSidebar" title="Open and preview CSV spreadsheet on screen">
-          VIEW / PREVIEW CSV
-        </button>
-        <button type="button" class="btn-export-tool" id="btnOpenCsvTabSidebar" title="Open raw CSV in a new browser tab">
-          OPEN CSV (NEW TAB) ↗
-        </button>
-        <button type="button" class="btn-export-tool" id="btnExportPdf" title="Export audit report as PDF">
-          EXPORT AS .PDF
-        </button>
-        <button type="button" class="btn-export-tool" id="btnDownloadJsonl" title="Download raw JSONL record byte-for-byte">
-          DOWNLOAD .JSONL
-        </button>
-        <button type="button" class="btn-export-tool" id="btnVerifyChain" title="Verify cryptographic SHA-256 hash chain">
-          VERIFY CHAIN
-        </button>
-      </div>
-
-      <div class="rack-section session-meta-box">
-        <div class="rack-header">SESSION METADATA</div>
-        <div class="meta-row">
-          <span class="meta-label">AGENT:</span>
-          <span class="meta-value">ZENITH</span>
-        </div>
-        <div class="meta-row">
-          <span class="meta-label">ACTIVE ID:</span>
-          <span class="meta-value mono" id="activeSessionId">NONE</span>
-        </div>
-        <div class="meta-row">
-          <span class="meta-label">GAME / MODE:</span>
-          <span class="meta-value" id="activeSessionMode">--</span>
-        </div>
-        <div class="meta-row">
-          <span class="meta-label">HASH CHAIN:</span>
-          <span class="meta-value mono" id="activeSessionChain">--</span>
+        <!-- Current Session Summary Block -->
+        <div class="current-session-box" id="currentSessionBox">
+          <div class="current-session-title mono">CURRENT SESSION</div>
+          <div class="current-session-grid mono">
+            <div class="cs-row">
+              <span class="cs-label">STAGE</span>
+              <span class="cs-val" id="csStage">SNAKE</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">MODE</span>
+              <span class="cs-val" id="csMode">DRY-RUN</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">PROVIDER</span>
+              <span class="cs-val" id="csProvider">MOCK</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">STRATEGY</span>
+              <span class="cs-val" id="csStrategy">v1 (Baseline)</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">MAX MOVES</span>
+              <span class="cs-val" id="csMaxMoves">15</span>
+            </div>
+            <div class="cs-row">
+              <span class="cs-label">STATUS</span>
+              <span class="cs-val cs-status-badge idle" id="csStatus">IDLE</span>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -246,6 +252,18 @@
                   <span class="kpi-label">RESULT</span>
                   <span class="kpi-value badge-applied" id="liveMoveResultBadge">APPLIED</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Live Goal Progress Strip -->
+            <div class="goal-progress-strip" id="goalProgressStrip">
+              <div class="goal-progress-header mono">
+                <span class="goal-badge">GOAL</span>
+                <span class="goal-progress-text" id="goalProgressText">FOOD 0 / 15</span>
+                <span class="goal-progress-pct mono" id="goalProgressPct">0%</span>
+              </div>
+              <div class="goal-progress-track">
+                <div class="goal-progress-fill" id="goalProgressFill" style="width: 0%;"></div>
               </div>
             </div>
 
@@ -372,19 +390,31 @@
                   </div>
                 </div>
 
+                <!-- Prominent Session Result Banner -->
+                <div class="session-outcome-banner" id="sessionOutcomeBanner" style="display: none;">
+                  <div class="outcome-banner-title mono" id="outcomeBannerTitle">STAGE COMPLETE // GOAL REACHED</div>
+                  <div class="outcome-banner-sub mono" id="outcomeBannerSub">FINAL SCORE: 0 &nbsp;|&nbsp; STEPS: 0 &nbsp;|&nbsp; 0 / 15 food</div>
+                </div>
+
                 <!-- End-of-Run Audit Card -->
                 <div class="audit-card" id="liveAuditCard" style="display: none;">
                   <div class="audit-header">SESSION FINISHED // AUDIT RESULT</div>
                   <div class="audit-grid mono">
                     <div>FINAL SCORE: <span id="auditScore">0</span></div>
                     <div>OUTCOME: <span id="auditOutcome">--</span></div>
+                    <div>GOAL REACHED: <span id="auditGoalReached">--</span></div>
+                    <div>GOAL PROGRESS: <span id="auditGoalProgress">--</span></div>
                     <div>HASH CHAIN: <span id="auditHashStatus">VERIFYING...</span></div>
                   </div>
-                  <div class="audit-actions">
+                  <div class="audit-actions primary-row">
                     <button type="button" class="btn-audit" id="btnLiveExportCsv">EXPORT CSV</button>
                     <button type="button" class="btn-audit" id="btnLiveExportPdf">EXPORT PDF</button>
                     <button type="button" class="btn-audit" id="btnLiveDownloadJsonl">DOWNLOAD .JSONL</button>
                     <button type="button" class="btn-audit" id="btnLiveVerify">RE-VERIFY CHAIN</button>
+                  </div>
+                  <div class="audit-actions secondary-row">
+                    <button type="button" class="btn-audit btn-secondary-audit" id="btnLivePreviewCsv" title="View / Preview CSV spreadsheet">VIEW / PREVIEW CSV</button>
+                    <button type="button" class="btn-audit btn-secondary-audit" id="btnLiveOpenCsvTab" title="Open raw CSV in a new browser tab">OPEN CSV (NEW TAB) ↗</button>
                   </div>
                 </div>
               </div>
