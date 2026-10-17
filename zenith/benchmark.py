@@ -15,7 +15,7 @@ import os
 import sys
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from zenith.decision_viewer import DecisionViewer
 from zenith.game2048_simulator import Deterministic2048Simulator
@@ -302,6 +302,14 @@ class Benchmark2048RunResult:
     log_path: str
     final_grid: Optional[List[List[int]]] = None
     failure_details: Optional[Dict[str, Any]] = None
+    total_source_records: Optional[int] = None
+    total_source_applied: Optional[int] = None
+    total_source_rejected: Optional[int] = None
+    segment_applied_moves: Optional[int] = None
+    segment_rejected_moves: Optional[int] = None
+    segment_index: Optional[int] = None
+    total_segments: Optional[int] = None
+
 
 
 def run_single_2048_benchmark(
@@ -428,6 +436,28 @@ def run_2048_benchmark_suite(
     return results
 
 
+def split_records_into_segments(records: Sequence[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    """Split session records into distinct game segments based on step resets.
+
+    A new segment begins whenever step == 1 and the current segment is not empty,
+    or whenever step decreases below the previous record's step.
+    """
+    segments: List[List[Dict[str, Any]]] = []
+    cur_seg: List[Dict[str, Any]] = []
+    prev_step = -1
+    for r in records:
+        step = r.get("step")
+        if isinstance(step, int):
+            if cur_seg and (step == 1 or step < prev_step):
+                segments.append(cur_seg)
+                cur_seg = []
+            prev_step = step
+        cur_seg.append(r)
+    if cur_seg:
+        segments.append(cur_seg)
+    return segments
+
+
 def format_2048_results_markdown(
     results: List[Benchmark2048RunResult],
     title: str = "2048 Benchmark Results",
@@ -436,13 +466,16 @@ def format_2048_results_markdown(
     lines = [
         f"### {title}",
         "",
-        "| Seed | Prompt | Best Tile | Merge Score | Tourn Score | Accepted Moves | Rejections | Won | Reason | Avg Latency (ms) | Time (s) | Chain Valid |",
-        "|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+        "| Seed | Prompt | Best Tile | Merge Score | Tourn Score | Accepted Moves | Rejections | Total Log (App/Rej) | Seg | Won | Reason | Avg Latency (ms) | Time (s) | Chain Valid |",
+        "|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
     ]
     for r in results:
+        tot_str = f"{r.total_source_applied}/{r.total_source_rejected}" if r.total_source_applied is not None else "-"
+        seg_str = f"{r.segment_index}/{r.total_segments}" if r.segment_index is not None else "-"
         lines.append(
             f"| {r.seed} | {r.prompt_version} | **{r.highest_tile}** | {r.score} | "
             f"{r.tournament_score} | {r.accepted_moves} | {r.rejected_moves} | "
+            f"{tot_str} | {seg_str} | "
             f"{'YES' if r.won else 'NO'} | `{r.termination_reason}` | "
             f"{r.avg_inference_ms} | {r.total_time_s} | "
             f"{'VALID' if r.hash_chain_valid else 'INVALID'} |"
@@ -480,7 +513,11 @@ def generate_2048_benchmark_from_logs(
     prompt_version: str = "v3",
     log_dir: str = BENCHMARK_LOG_DIR,
 ) -> List[Benchmark2048RunResult]:
-    """Derive 2048 benchmark run results directly from verified JSONL source logs without hardcoded metrics."""
+    """Derive 2048 benchmark run results directly from verified JSONL source logs without hardcoded metrics.
+
+    Distinguishes the complete append-only source log metrics from the selected
+    evaluated game segment metrics.
+    """
     results: List[Benchmark2048RunResult] = []
     for seed in seeds:
         jsonl_path = os.path.join(log_dir, f"bench-2048-{prompt_version}-{seed}.jsonl")
@@ -491,45 +528,44 @@ def generate_2048_benchmark_from_logs(
         if not v_res.is_valid:
             raise ValueError(f"Corrupted hash chain in {jsonl_path}: {v_res.error_message}")
 
-        applied_count = 0
-        rejected_count = 0
-        fallback_count = 0
-        inf_times: List[int] = []
-        last_rec: Optional[Dict[str, Any]] = None
-        highest_tile = 0
-
+        raw_recs: List[Dict[str, Any]] = []
         with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
                 clean = line.strip()
-                if not clean:
-                    continue
-                rec = json.loads(clean)
-                last_rec = rec
-                res = rec.get("result")
-                if res == "applied":
-                    applied_count += 1
-                elif res == "rejected":
-                    rejected_count += 1
+                if clean:
+                    raw_recs.append(json.loads(clean))
 
-                dec = rec.get("decision", {})
-                if isinstance(dec, dict) and dec.get("source") == "fallback":
-                    fallback_count += 1
+        total_source_records = len(raw_recs)
+        total_source_applied = sum(1 for r in raw_recs if r.get("result") == "applied")
+        total_source_rejected = sum(1 for r in raw_recs if r.get("result") == "rejected")
 
-                timing = rec.get("timing", {})
-                if isinstance(timing, dict) and "decide_ms" in timing:
-                    inf_times.append(timing["decide_ms"])
+        segments = split_records_into_segments(raw_recs)
+        selected_seg = segments[-1] if segments else []
+        segment_index = len(segments)
+        total_segments = len(segments)
 
-                state_after = rec.get("state_after", {})
-                if isinstance(state_after, dict):
-                    b = state_after.get("best", 0)
-                    if b > highest_tile:
-                        highest_tile = b
+        applied_count = sum(1 for r in selected_seg if r.get("result") == "applied")
+        rejected_count = sum(1 for r in selected_seg if r.get("result") == "rejected")
+        fallback_count = sum(1 for r in selected_seg if r.get("decision", {}).get("source") == "fallback")
 
-        final_state = last_rec.get("state_after", {}) if last_rec else {}
+        inf_times: List[int] = []
+        highest_tile = 0
+        for r in selected_seg:
+            timing = r.get("timing", {})
+            if isinstance(timing, dict) and "decide_ms" in timing:
+                dec_ms = timing["decide_ms"]
+                if isinstance(dec_ms, (int, float)):
+                    inf_times.append(int(dec_ms))
+            state_after = r.get("state_after", {})
+            if isinstance(state_after, dict):
+                b = state_after.get("best", 0)
+                if isinstance(b, int) and b > highest_tile:
+                    highest_tile = b
+
+        final_state = selected_seg[-1].get("state_after", {}) if selected_seg else {}
         score = final_state.get("score", 0)
         final_grid = final_state.get("grid")
 
-        # Tournament score formula: min(1000, max(0, floor(log2(best) - 6) * 143 + score/1000)) for best >= 128
         tournament_score = 0
         if highest_tile >= 128:
             factor = int(math.floor(math.log2(highest_tile) - 6))
@@ -574,6 +610,13 @@ def generate_2048_benchmark_from_logs(
                 log_path=jsonl_path.replace("\\", "/"),
                 final_grid=final_grid,
                 failure_details=None,
+                total_source_records=total_source_records,
+                total_source_applied=total_source_applied,
+                total_source_rejected=total_source_rejected,
+                segment_applied_moves=applied_count,
+                segment_rejected_moves=rejected_count,
+                segment_index=segment_index,
+                total_segments=total_segments,
             )
         )
     return results

@@ -34,6 +34,7 @@ SUMMARY_FIELDNAMES = [
     "session_id",
     "game",
     "run_type",
+    "record_scope",
     "agent_name",
     "model_id",
     "prompt_version",
@@ -48,6 +49,11 @@ SUMMARY_FIELDNAMES = [
     "applied_moves",
     "rejected_moves",
     "fallback_moves",
+    "total_source_records",
+    "total_source_applied",
+    "total_source_rejected",
+    "segment_index",
+    "segment_count",
     "avg_decision_ms",
     "total_duration_s",
     "hash_chain_valid",
@@ -55,6 +61,7 @@ SUMMARY_FIELDNAMES = [
     "run_timestamp",
     "aggregated_at",
 ]
+
 
 
 UUID_PATTERN = re.compile(
@@ -100,6 +107,9 @@ def parse_jsonl_session(
 ) -> Dict[str, Any]:
     """Extract metrics, counts, timings, and verify hash chain of a JSONL log file.
 
+    Identifies distinct game segments when step resets occur, providing both
+    whole-source-log metrics and evaluated game segment metrics.
+
     Args:
         log_path: Path to the JSONL log file.
         check_hash: Whether to independently verify the SHA-256 hash chain.
@@ -115,6 +125,14 @@ def parse_jsonl_session(
         "applied_moves": 0,
         "rejected_moves": 0,
         "fallback_moves": 0,
+        "total_source_records": 0,
+        "total_source_applied": 0,
+        "total_source_rejected": 0,
+        "segment_applied_moves": 0,
+        "segment_rejected_moves": 0,
+        "segment_index": 1,
+        "segment_count": 1,
+        "record_scope": "single_game",
         "avg_decision_ms": None,
         "total_duration_s": None,
         "hash_chain_valid": None,
@@ -138,9 +156,7 @@ def parse_jsonl_session(
             res["hash_chain_valid"] = False
             res["error"] = f"Hash verification exception: {exc}"
 
-    decide_times: List[int] = []
-    first_dt: Optional[datetime] = None
-    last_dt: Optional[datetime] = None
+    raw_records: List[Dict[str, Any]] = []
 
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -161,86 +177,103 @@ def parse_jsonl_session(
                     continue
 
                 res["record_count"] += 1
-
-                # Extract top-level session identity from first valid record
-                if res["session_id"] is None and "session_id" in rec:
-                    res["session_id"] = str(rec["session_id"]).strip()
-                if res["game"] is None and "game" in rec:
-                    res["game"] = str(rec["game"]).strip()
-
-                # Detect prompt version if present in question text
-                if res["prompt_version"] is None:
-                    dec = rec.get("decision", {})
-                    if isinstance(dec, dict):
-                        qs = dec.get("questions", [])
-                        if isinstance(qs, list) and qs:
-                            q_text = str(qs[0])
-                            if "Which safe direction should the snake choose" in q_text:
-                                res["prompt_version"] = "v2"
-                            elif "In this Snake game on a 12x12 board" in q_text:
-                                res["prompt_version"] = "v1"
-                            elif "Strategic Priorities:" in q_text:
-                                res["prompt_version"] = "v3"
-                            elif "build toward tile 512" in q_text:
-                                res["prompt_version"] = "v2"
-                            elif "In this 2048 game on a 4x4 grid" in q_text:
-                                res["prompt_version"] = "v1"
-
-
-                # Count moves
-                result_val = rec.get("result", "applied")
-                if result_val == "applied":
-                    res["applied_moves"] += 1
-                elif result_val == "rejected":
-                    res["rejected_moves"] += 1
-
-                # Track fallback
-                dec = rec.get("decision", {})
-                if isinstance(dec, dict) and dec.get("source") == "fallback":
-                    res["fallback_moves"] += 1
-
-                # Track decision timing
-                timing = rec.get("timing", {})
-                if isinstance(timing, dict):
-                    decide_ms = timing.get("decide_ms")
-                    if isinstance(decide_ms, (int, float)) and not isinstance(decide_ms, bool):
-                        decide_times.append(int(decide_ms))
-
-                # Track timestamps
-                ts_str = rec.get("ts")
-                if ts_str:
-                    dt = _parse_iso_ts(ts_str)
-                    if dt:
-                        if first_dt is None:
-                            first_dt = dt
-                            res["run_timestamp"] = ts_str
-                        last_dt = dt
-
-                # Track last food eaten / best tile / score from state_after if available
-                state_after = rec.get("state_after")
-                if isinstance(state_after, dict):
-                    fe = state_after.get("foodEaten")
-                    if isinstance(fe, int):
-                        res["last_food_eaten"] = fe
-                    best = state_after.get("best")
-                    if isinstance(best, int):
-                        res["last_best"] = best
-                    sc = state_after.get("score")
-                    if isinstance(sc, (int, float)):
-                        res["last_score"] = int(sc)
-
+                raw_records.append(rec)
 
     except Exception as exc:
         res["error"] = f"Failed to read {path}: {exc}"
         return res
 
+    res["total_source_records"] = res["record_count"]
+    res["total_source_applied"] = sum(1 for r in raw_records if r.get("result") == "applied")
+    res["total_source_rejected"] = sum(1 for r in raw_records if r.get("result") == "rejected")
+
+    # Split records into game segments based on step resets
+    segments: List[List[Dict[str, Any]]] = []
+    cur_seg: List[Dict[str, Any]] = []
+    prev_step = -1
+    for r in raw_records:
+        step = r.get("step")
+        if isinstance(step, int):
+            if cur_seg and (step == 1 or step < prev_step):
+                segments.append(cur_seg)
+                cur_seg = []
+            prev_step = step
+        cur_seg.append(r)
+    if cur_seg:
+        segments.append(cur_seg)
+
+    res["segment_count"] = len(segments)
+    res["segment_index"] = len(segments)
+    res["record_scope"] = "evaluated_game_segment" if len(segments) > 1 else "single_game"
+
+    eval_seg = segments[-1] if segments else []
+    res["applied_moves"] = sum(1 for r in eval_seg if r.get("result") == "applied")
+    res["rejected_moves"] = sum(1 for r in eval_seg if r.get("result") == "rejected")
+    res["segment_applied_moves"] = res["applied_moves"]
+    res["segment_rejected_moves"] = res["rejected_moves"]
+    res["fallback_moves"] = sum(1 for r in eval_seg if r.get("decision", {}).get("source") == "fallback")
+
+    # Session identity and prompt version
+    for r in raw_records:
+        if res["session_id"] is None and "session_id" in r:
+            res["session_id"] = str(r["session_id"]).strip()
+        if res["game"] is None and "game" in r:
+            res["game"] = str(r["game"]).strip()
+        if res["prompt_version"] is None:
+            dec = r.get("decision", {})
+            if isinstance(dec, dict):
+                qs = dec.get("questions", [])
+                if isinstance(qs, list) and qs:
+                    q_text = str(qs[0])
+                    if "Which safe direction should the snake choose" in q_text:
+                        res["prompt_version"] = "v2"
+                    elif "In this Snake game on a 12x12 board" in q_text:
+                        res["prompt_version"] = "v1"
+                    elif "Strategic Priorities:" in q_text or "Strategic priority:" in q_text:
+                        res["prompt_version"] = "v3"
+                    elif "build toward tile 512" in q_text:
+                        res["prompt_version"] = "v2"
+                    elif "In this 2048 game on a 4x4 grid" in q_text:
+                        res["prompt_version"] = "v1"
+
+    # Evaluated segment metrics
+    decide_times: List[int] = []
+    first_dt: Optional[datetime] = None
+    last_dt: Optional[datetime] = None
+
+    for r in eval_seg:
+        timing = r.get("timing", {})
+        if isinstance(timing, dict):
+            decide_ms = timing.get("decide_ms")
+            if isinstance(decide_ms, (int, float)) and not isinstance(decide_ms, bool):
+                decide_times.append(int(decide_ms))
+        ts_str = r.get("ts")
+        if ts_str:
+            dt = _parse_iso_ts(ts_str)
+            if dt:
+                if first_dt is None:
+                    first_dt = dt
+                    res["run_timestamp"] = ts_str
+                last_dt = dt
+        state_after = r.get("state_after")
+        if isinstance(state_after, dict):
+            fe = state_after.get("foodEaten")
+            if isinstance(fe, int):
+                res["last_food_eaten"] = fe
+            best = state_after.get("best")
+            if isinstance(best, int):
+                res["last_best"] = best
+            sc = state_after.get("score")
+            if isinstance(sc, (int, float)):
+                res["last_score"] = int(sc)
+
     if decide_times:
         res["avg_decision_ms"] = round(sum(decide_times) / len(decide_times), 2)
-
     if first_dt and last_dt and last_dt >= first_dt:
         res["total_duration_s"] = round((last_dt - first_dt).total_seconds(), 2)
 
     return res
+
 
 
 def parse_final_response(final_path: Union[str, Path]) -> Dict[str, Any]:
@@ -462,6 +495,12 @@ def discover_and_aggregate_runs(
             applied_moves = jsonl_info.get("applied_moves", 0)
             rejected_moves = jsonl_info.get("rejected_moves", 0)
             fallback_moves = jsonl_info.get("fallback_moves", 0)
+            total_source_records = jsonl_info.get("total_source_records", jsonl_info.get("record_count", 0))
+            total_source_applied = jsonl_info.get("total_source_applied", applied_moves)
+            total_source_rejected = jsonl_info.get("total_source_rejected", rejected_moves)
+            segment_index = jsonl_info.get("segment_index", 1)
+            segment_count = jsonl_info.get("segment_count", 1)
+            record_scope = jsonl_info.get("record_scope", "single_game")
             steps = applied_moves
         else:
             applied_moves = bench_data.get("accepted_moves", 0)
@@ -470,6 +509,12 @@ def discover_and_aggregate_runs(
             steps = final_data.get("steps")
             if steps is None:
                 steps = bench_data.get("accepted_moves")
+            total_source_records = bench_data.get("total_source_records", applied_moves + rejected_moves)
+            total_source_applied = bench_data.get("total_source_applied", applied_moves)
+            total_source_rejected = bench_data.get("total_source_rejected", rejected_moves)
+            segment_index = bench_data.get("segment_index", 1)
+            segment_count = bench_data.get("total_segments", 1)
+            record_scope = "evaluated_game_segment" if (segment_count and segment_count > 1) else "single_game"
 
         # Timings
         avg_decision_ms = jsonl_info.get("avg_decision_ms")
@@ -499,6 +544,7 @@ def discover_and_aggregate_runs(
             "session_id": sess_id,
             "game": game,
             "run_type": run_type,
+            "record_scope": record_scope,
             "agent_name": agent_name,
             "model_id": model_id,
             "prompt_version": prompt_version,
@@ -507,13 +553,17 @@ def discover_and_aggregate_runs(
             "steps": steps,
             "highest_tile": highest_tile,
             "foods_eaten": foods_eaten,
-
             "won": won,
             "done": done,
             "termination_reason": termination_reason,
             "applied_moves": applied_moves,
             "rejected_moves": rejected_moves,
             "fallback_moves": fallback_moves,
+            "total_source_records": total_source_records,
+            "total_source_applied": total_source_applied,
+            "total_source_rejected": total_source_rejected,
+            "segment_index": segment_index,
+            "segment_count": segment_count,
             "avg_decision_ms": avg_decision_ms,
             "total_duration_s": total_duration_s,
             "hash_chain_valid": hash_chain_valid,
@@ -639,7 +689,7 @@ def generate_benchmark_report_md(
         "",
         "## 2. Consolidated Run History",
         "",
-        "| Session ID | Run Type | Prompt | Seed | Score | Steps | Food | Won | Applied | Rejected | Fallback | Avg Latency | Hash Valid |",
+        "| Session ID | Run Type | Scope | Prompt | Seed | Score | Steps (Seg) | Food | Won | Seg Moves (App/Rej) | Total Log (App/Rej) | Avg Latency | Hash Valid |",
         "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
     ])
 
@@ -653,9 +703,12 @@ def generate_benchmark_report_md(
         won_str = "YES" if r["won"] else "NO"
         lat_val = f"{r['avg_decision_ms']} ms" if r["avg_decision_ms"] is not None else "-"
         h_val = "PASS" if r["hash_chain_valid"] else ("FAIL" if r["hash_chain_valid"] is False else "N/A")
+        scope_str = "Segment" if r.get("record_scope") == "evaluated_game_segment" else "Single"
+        seg_str = f"{r['applied_moves']}/{r['rejected_moves']}"
+        tot_str = f"{r.get('total_source_applied', r['applied_moves'])}/{r.get('total_source_rejected', r['rejected_moves'])}"
 
         lines.append(
-            f"| `{sid_short}` | `{r['run_type']}` | {p_ver} | {seed_val} | {score_val} | {steps_val} | {food_val} | {won_str} | {r['applied_moves']} | {r['rejected_moves']} | {r['fallback_moves']} | {lat_val} | **{h_val}** |"
+            f"| `{sid_short}` | `{r['run_type']}` | {scope_str} | {p_ver} | {seed_val} | {score_val} | {steps_val} | {food_val} | {won_str} | {seg_str} | {tot_str} | {lat_val} | **{h_val}** |"
         )
 
     lines.extend([
@@ -723,8 +776,8 @@ def generate_benchmark_report_md(
             "> **2048 Simulator Equivalence & Qualification Scope:**",
             "> `Deterministic2048Simulator` implements the official TopGameAI 4x4 mechanics, single-merge-per-move rules, 90/10 tile spawning, and no-op move rejection. Local simulation results are reproducible benchmark baselines and do NOT substitute for an official Arena qualifying run.",
             "",
-            "| Seed | Prompt | Best Tile | Merge Score | Steps | Rejections | Won | Reason | Avg Latency | Chain Valid |",
-            "|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+            "| Seed | Prompt | Best Tile | Merge Score | Steps (Seg) | Rejections (Seg) | Total Log (App/Rej) | Scope | Won | Reason | Avg Latency | Chain Valid |",
+            "|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
         ])
         for r in g2048_runs:
             s_val = r["seed"] if r["seed"] is not None else "-"
@@ -733,12 +786,14 @@ def generate_benchmark_report_md(
             score_val = r["score"] if r["score"] is not None else "-"
             steps_val = r["steps"] if r["steps"] is not None else "-"
             rej_val = r["rejected_moves"]
+            tot_str = f"{r.get('total_source_applied', r['applied_moves'])}/{r.get('total_source_rejected', r['rejected_moves'])}"
+            scope_val = "Segment" if r.get("record_scope") == "evaluated_game_segment" else "Single"
             won_val = "YES" if r["won"] else "NO"
             reason_val = r.get("termination_reason") or "-"
             lat_val = f"{r['avg_decision_ms']} ms" if r["avg_decision_ms"] is not None else "-"
             h_val = "PASS" if r["hash_chain_valid"] else ("FAIL" if r["hash_chain_valid"] is False else "N/A")
             lines.append(
-                f"| {s_val} | {p_val} | **{tile_val}** | {score_val} | {steps_val} | {rej_val} | {won_val} | `{reason_val}` | {lat_val} | **{h_val}** |"
+                f"| {s_val} | {p_val} | **{tile_val}** | {score_val} | {steps_val} | {rej_val} | {tot_str} | {scope_val} | {won_val} | `{reason_val}` | {lat_val} | **{h_val}** |"
             )
 
         tiles = [r["highest_tile"] for r in g2048_runs if r.get("highest_tile") is not None]
@@ -767,18 +822,20 @@ def generate_benchmark_report_md(
             ])
             if has_v3:
                 lines.extend([
-                    "| Seed | v1 Best | v2 Best | v3 Best | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves | v3 Rej | v3 Reason |",
+                    "| Seed | v1 Best | v2 Best | v3 Best | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves (Seg / Total) | v3 Rej (Seg / Total) | v3 Reason |",
                     "|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
                 ])
                 for s in common_2048_seeds:
                     r1 = g2048_v1.get(s, {})
                     r2 = g2048_v2.get(s, {})
                     r3 = g2048_v3.get(s, {})
+                    v3_moves_str = f"**{r3.get('steps', '-')}** ({r3.get('total_source_applied', r3.get('steps', '-'))})" if r3 else "-"
+                    v3_rej_str = f"**{r3.get('rejected_moves', '-')}** ({r3.get('total_source_rejected', r3.get('rejected_moves', '-'))})" if r3 else "-"
                     lines.append(
                         f"| {s} | {r1.get('highest_tile', '-')} | {r2.get('highest_tile', '-')} | **{r3.get('highest_tile', '-')}** | "
                         f"{r1.get('score', '-')} | {r2.get('score', '-')} | **{r3.get('score', '-')}** | "
-                        f"{r1.get('steps', '-')} | {r2.get('steps', '-')} | {r3.get('steps', '-')} | "
-                        f"{r3.get('rejected_moves', '-')} | `{r3.get('termination_reason', '-')}` |"
+                        f"{r1.get('steps', '-')} | {r2.get('steps', '-')} | {v3_moves_str} | "
+                        f"{v3_rej_str} | `{r3.get('termination_reason', '-')}` |"
                     )
             else:
                 lines.extend([
@@ -791,6 +848,8 @@ def generate_benchmark_report_md(
                     lines.append(
                         f"| {s} | {r1.get('highest_tile', '-')} | **{r2.get('highest_tile', '-')}** | {r1.get('score', '-')} | **{r2.get('score', '-')}** | {r1.get('steps', '-')} | {r2.get('steps', '-')} | {r1.get('rejected_moves', '-')} | **{r2.get('rejected_moves', '-')}** | `{r1.get('termination_reason', '-')}` | `{r2.get('termination_reason', '-')}` |"
                     )
+
+
 
     lines.extend([
         "",

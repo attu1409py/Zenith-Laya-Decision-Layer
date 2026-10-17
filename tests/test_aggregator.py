@@ -336,6 +336,119 @@ class TestAggregatorProcessing(unittest.TestCase):
         self.assertTrue((out_dir / "run_history.csv").is_file())
         self.assertTrue((out_dir / "benchmark_report.md").is_file())
 
+    def test_parse_multi_segment_jsonl_session(self):
+        """parse_jsonl_session on multi-attempt logs correctly identifies evaluated segment and whole-log counts."""
+        session_id = "bench-multi-test"
+        log_file = self.tmp_path / f"{session_id}.jsonl"
+        prev_hash = get_genesis_prev_hash(session_id)
+
+        with open(log_file, "w", encoding="utf-8") as f:
+            # Segment 1: 3 applied, 2 rejected (5 records)
+            for s in range(1, 4):
+                raw = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": s,
+                    "result": "applied",
+                    "action": "left",
+                    "state_after": {"best": 16, "score": s * 4},
+                    "decision": {"source": "laya", "questions": ["Strategic priority: anchor?"]},
+                    "timing": {"decide_ms": 40},
+                    "ts": f"2026-10-16T12:00:0{s}Z",
+                }
+                c = create_chained_record(raw, prev_hash)
+                f.write(serialize_record_to_jsonl(c) + "\n")
+                prev_hash = c["hash"]
+
+            for r_idx in range(2):
+                raw = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": 4,
+                    "result": "rejected",
+                    "action": "up",
+                    "state_after": {"best": 16, "score": 12},
+                    "decision": {"source": "laya"},
+                    "timing": {"decide_ms": 40},
+                    "ts": f"2026-10-16T12:00:1{r_idx}Z",
+                }
+                c = create_chained_record(raw, prev_hash)
+                f.write(serialize_record_to_jsonl(c) + "\n")
+                prev_hash = c["hash"]
+
+            # Segment 2: 5 applied, 0 rejected (5 records)
+            for s in range(1, 6):
+                raw = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": s,
+                    "result": "applied",
+                    "action": "right",
+                    "state_after": {"best": 64, "score": 100 + s * 10},
+                    "decision": {"source": "laya", "questions": ["Strategic priority: anchor?"]},
+                    "timing": {"decide_ms": 45},
+                    "ts": f"2026-10-16T12:05:0{s}Z",
+                }
+                c = create_chained_record(raw, prev_hash)
+                f.write(serialize_record_to_jsonl(c) + "\n")
+                prev_hash = c["hash"]
+
+        info = parse_jsonl_session(log_file, check_hash=True)
+        self.assertTrue(info["hash_chain_valid"])
+        self.assertEqual(info["record_scope"], "evaluated_game_segment")
+        self.assertEqual(info["segment_count"], 2)
+        self.assertEqual(info["segment_index"], 2)
+        self.assertEqual(info["applied_moves"], 5)
+        self.assertEqual(info["rejected_moves"], 0)
+        self.assertEqual(info["total_source_records"], 10)
+        self.assertEqual(info["total_source_applied"], 8)
+        self.assertEqual(info["total_source_rejected"], 2)
+        self.assertEqual(info["last_best"], 64)
+        self.assertEqual(info["last_score"], 150)
+
+    def test_aggregate_multi_segment_session(self):
+        """discover_and_aggregate_runs correctly handles multi-segment records."""
+        session_id = "bench-multi-agg"
+        log_file = self.tmp_path / f"{session_id}.jsonl"
+        prev_hash = get_genesis_prev_hash(session_id)
+
+        with open(log_file, "w", encoding="utf-8") as f:
+            for s in range(1, 3):
+                raw = {
+                    "session_id": session_id, "game": "2048", "step": s, "result": "applied",
+                    "action": "left", "state_after": {"best": 8, "score": s * 4},
+                    "decision": {"source": "laya", "questions": ["Strategic priority: anchor?"]},
+                    "timing": {"decide_ms": 40}, "ts": f"2026-10-16T12:00:0{s}Z",
+                }
+                c = create_chained_record(raw, prev_hash)
+                f.write(serialize_record_to_jsonl(c) + "\n")
+                prev_hash = c["hash"]
+
+            for s in range(1, 5):
+                raw = {
+                    "session_id": session_id, "game": "2048", "step": s, "result": "applied",
+                    "action": "right", "state_after": {"best": 32, "score": 50 + s * 10},
+                    "decision": {"source": "laya", "questions": ["Strategic priority: anchor?"]},
+                    "timing": {"decide_ms": 45}, "ts": f"2026-10-16T12:05:0{s}Z",
+                }
+                c = create_chained_record(raw, prev_hash)
+                f.write(serialize_record_to_jsonl(c) + "\n")
+                prev_hash = c["hash"]
+
+        records = discover_and_aggregate_runs([self.tmp_path], check_hash=True)
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec["record_scope"], "evaluated_game_segment")
+        self.assertEqual(rec["steps"], 4)
+        self.assertEqual(rec["applied_moves"], 4)
+        self.assertEqual(rec["rejected_moves"], 0)
+        self.assertEqual(rec["total_source_records"], 6)
+        self.assertEqual(rec["total_source_applied"], 6)
+        self.assertEqual(rec["segment_count"], 2)
+        self.assertEqual(rec["highest_tile"], 32)
+        self.assertEqual(rec["score"], 90)
+
 
 if __name__ == "__main__":
     unittest.main()
+

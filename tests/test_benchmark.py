@@ -419,7 +419,109 @@ class Test2048BenchmarkSuite(unittest.TestCase):
         self.assertTrue(r.hash_chain_valid)
         self.assertEqual(r.termination_reason, "no_moves_remaining")
 
+    def test_split_records_into_segments(self):
+        """split_records_into_segments correctly separates segments on step resets."""
+        from zenith.benchmark import split_records_into_segments
+        records = [
+            {"step": 1, "result": "applied"},
+            {"step": 2, "result": "applied"},
+            {"step": 3, "result": "rejected"},
+            {"step": 1, "result": "applied"},  # Reset to 1
+            {"step": 2, "result": "applied"},
+        ]
+        segs = split_records_into_segments(records)
+        self.assertEqual(len(segs), 2)
+        self.assertEqual(len(segs[0]), 3)
+        self.assertEqual(len(segs[1]), 2)
+
+    def test_multi_segment_benchmark_log_disentanglement(self):
+        """generate_2048_benchmark_from_logs must distinguish whole source log counts from evaluated segment."""
+        from pathlib import Path
+        from zenith.hash_chain import create_chained_record, get_genesis_prev_hash, serialize_record_to_jsonl
+        from zenith.benchmark import generate_2048_benchmark_from_logs
+
+        session_id = "bench-2048-v3-999"
+        jsonl_path = Path(self._tmp_dir) / f"{session_id}.jsonl"
+        prev_hash = get_genesis_prev_hash(session_id)
+
+        # Write segment 1: 5 applied moves, 9 rejected moves (14 records)
+        with open(jsonl_path, "w", encoding="utf-8") as f:
+            for s in range(1, 6):
+                rec = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": s,
+                    "result": "applied",
+                    "action": "left",
+                    "state_after": {"score": s * 4, "best": 8, "grid": [[8, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]},
+                    "timing": {"decide_ms": 50},
+                    "decision": {"source": "laya"},
+                    "ts": f"2026-10-16T10:00:0{s}Z",
+                }
+                chained = create_chained_record(rec, prev_hash)
+                f.write(serialize_record_to_jsonl(chained) + "\n")
+                prev_hash = chained["hash"]
+
+            for rej_idx in range(9):
+                rec = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": 6,
+                    "result": "rejected",
+                    "action": "up",
+                    "state_after": {"score": 20, "best": 8, "grid": [[8, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]},
+                    "timing": {"decide_ms": 50},
+                    "decision": {"source": "laya"},
+                    "ts": f"2026-10-16T10:00:1{rej_idx}Z",
+                }
+                chained = create_chained_record(rec, prev_hash)
+                f.write(serialize_record_to_jsonl(chained) + "\n")
+                prev_hash = chained["hash"]
+
+            # Write segment 2: 20 applied moves, 0 rejected moves (20 records)
+            for s in range(1, 21):
+                rec = {
+                    "session_id": session_id,
+                    "game": "2048",
+                    "step": s,
+                    "result": "applied",
+                    "action": "down",
+                    "state_after": {"score": 100 + s * 10, "best": 256, "grid": [[256, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]},
+                    "timing": {"decide_ms": 52},
+                    "decision": {"source": "laya"},
+                    "ts": f"2026-10-16T11:00:{s:02d}Z",
+                }
+                chained = create_chained_record(rec, prev_hash)
+                f.write(serialize_record_to_jsonl(chained) + "\n")
+                prev_hash = chained["hash"]
+
+        # Parse with generate_2048_benchmark_from_logs
+        results = generate_2048_benchmark_from_logs(
+            seeds=[999],
+            prompt_version="v3",
+            log_dir=self._tmp_dir,
+        )
+        self.assertEqual(len(results), 1)
+        r = results[0]
+
+        # Evaluated segment metrics (Segment 2)
+        self.assertEqual(r.accepted_moves, 20)  # Must be 20, NOT 25!
+        self.assertEqual(r.rejected_moves, 0)   # Must be 0, NOT 9!
+        self.assertEqual(r.segment_applied_moves, 20)
+        self.assertEqual(r.segment_rejected_moves, 0)
+        self.assertEqual(r.highest_tile, 256)
+        self.assertEqual(r.score, 300)
+
+        # Whole source-log metrics
+        self.assertEqual(r.total_source_records, 34)  # 5 + 9 + 20
+        self.assertEqual(r.total_source_applied, 25)  # 5 + 20
+        self.assertEqual(r.total_source_rejected, 9)   # 9
+        self.assertEqual(r.segment_index, 2)
+        self.assertEqual(r.total_segments, 2)
+        self.assertTrue(r.hash_chain_valid)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

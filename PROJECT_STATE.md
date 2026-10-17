@@ -1,56 +1,55 @@
 # Team ZENITH - Project State
 
-**Last updated:** 2026-10-17 (Task M6C completed)\
+**Last updated:** 2026-10-17 (Task M6D completed)\
 **Project:** Laya decision layer for PS 02 - Beat the Bot\
 **Team/agent name:** `ZENITH`
 
 ## Current status
 
-**Status: TASK M6C COMPLETED / 2048 v3 BENCHMARK INTEGRITY AUDIT & RECONCILIATION (233 TESTS PASSING)**
+**Status: TASK M6D COMPLETED / FINAL BENCHMARK SEGMENT INTEGRITY CHECK (237 TESTS PASSING)**
 
-Task M6C conducted a forensic audit across all raw v3 JSONL logs, final response payloads, benchmark JSON summaries, and the consolidated run history, establishing a single source of truth derived directly from verified disk records:
-- **Seed 13 Discrepancy Forensic Resolution:**
-  - Audited `bench-2048-v3-13.jsonl` directly: contains 265 total records consisting of **247 applied** moves, **18 rejected** moves, and 0 fallback moves across the continuous log (or 152 applied and 9 rejected in the final continuous game segment).
-  - Traced the origin of the previously reported `10` rejections to an inline script in step 1051 that explicitly assigned `rejected_moves = 0 if s != 13 else 10`. That assignment was an ungrounded guess that directly contradicted the raw log.
-  - Replaced all ad-hoc summaries with `generate_2048_benchmark_from_logs` in `zenith/benchmark.py`, which derives all counts directly from the `result` fields of verified JSONL files with zero hardcoded per-seed metrics.
-- **Continuous Multi-Segment Log Reconciliation:**
-  - Detailed audit of standard seeds `[42, 100, 2026, 7, 13]` revealed two continuous run segments preserved in append-only JSONL files:
-    - *Segment 1:* Exploratory trial with early verbose criteria (which encountered 9 consecutive rejections on each seed).
-    - *Segment 2:* Finalized v3 prompt trial (clean strategic play).
-    - Under competition rule 6 ("never delete or amend failed/abandoned logs"), the entire continuous log from `GENESIS-bench-2048-v3-{seed}` to the final line is preserved with 100% valid SHA-256 cryptographic linkage.
-  - Derived counts from verified source records:
-    - Seed 42: 409 accepted, 9 rejected (281 accepted, 0 rejected in final segment) | Best: 256 | Score: 3,320
-    - Seed 100: 162 accepted, 9 rejected (80 accepted, 0 rejected in final segment) | Best: 64 | Score: 600
-    - Seed 2026: 254 accepted, 9 rejected (235 accepted, 0 rejected in final segment) | Best: 256 | Score: 2,844
-    - Seed 7: 391 accepted, 9 rejected (312 accepted, 0 rejected in final segment) | Best: 512 | Score: 4,588
-    - Seed 13: 247 accepted, 18 rejected (152 accepted, 9 rejected in final segment) | Best: 256 | Score: 1,960
-  - Holdout seeds `[99, 123, 777]` have single-segment continuous logs with 0 rejections across all 818 moves (Seed 99 reached 512 with 5,812 pts).
-- **Audit & Cryptographic Verification:**
-  - **233 unit tests** passing in ~4.45s, 100% pass rate (0 failures, 0 errors) [PASS].
-  - Aggregated 31 total runs across `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md`.
+Task M6D validated that ZENITH's consolidated benchmark history strictly distinguishes complete append-only source logs from individual evaluated game segments:
+- **Forensic Segment Disentanglement:**
+  - Standard v3 logs contain continuous append-only exploratory attempts concatenated with final evaluated game segments (fully compliant with rule 6: "never delete or amend failed/abandoned logs").
+  - Evaluated segments are identified unambiguously via step resets (`step == 1` or decreases) and state/termination markers, matching `_final.json` session records.
+  - Distinct fields are maintained across models and schemas:
+    - Whole-log metrics: `total_source_records`, `total_source_applied`, `total_source_rejected`.
+    - Selected segment metrics: `applied_moves`, `rejected_moves`, `segment_applied_moves`, `segment_rejected_moves`, `highest_tile`, `score`, `termination_reason`, `segment_index`, `segment_count`, `record_scope`.
+- **Benchmark & Reporting Reconciliation:**
+  - `benchmark_2048_v3.json` is tied directly to the evaluated game segments (e.g., Seed 42: 281 moves; Seed 100: 80 moves; Seed 2026: 235 moves; Seed 7: 312 moves; Seed 13: 152 moves), with full preservation of source-log metrics.
+  - `run_history.jsonl`, `run_history.csv`, and `benchmark_report.md` explicitly tag `record_scope` (`"evaluated_game_segment"` vs `"single_game"`) and present both segment moves and whole-log moves.
+  - Holdout seeds `[99, 123, 777]` verified as single-pass runs (`segment_count = 1`, 0 rejections).
+- **Test Suite & Cryptographic Audit:**
+  - **237 unit tests** passing in ~3.92s, 100% pass rate (4 new regression tests) [PASS].
   - **31 / 31 (100.0%) SHA-256 hash chains independently verified valid** [PASS].
-  - Zero live Arena competition calls made or consumed during this milestone.
+  - Zero original `.jsonl` audit logs modified, truncated, or rehashed.
+  - Zero live Arena competition calls made or consumed during this task.
+  - Benchmark data is fully reconciled and verified ready for M7 live session.
 
-## Files created / changed in Task M6C
+## Files created / changed in Task M6D
 
-- `zenith/benchmark.py` (added `generate_2048_benchmark_from_logs` to derive metrics directly from verified JSONL source logs without hardcoded metrics)
-- `zenith/aggregator.py` (reconciled `steps` and `applied_moves` to derive directly from JSONL records, added `last_score` tracking in `parse_jsonl_session`)
-- `tests/test_benchmark.py` (added `test_generate_2048_benchmark_from_logs` unit test; 233 total tests in suite)
-- `logs/benchmarks/benchmark_2048_v3.json` (regenerated directly from source logs without hardcoding)
-- `logs/benchmarks/run_history.jsonl`, `run_history.csv`, `benchmark_report.md` (re-aggregated with 100% reconciled source metrics)
-- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (updated with audit findings, reconciled metrics, and next steps)
+- `zenith/benchmark.py` (added `split_records_into_segments`, updated `Benchmark2048RunResult` and `generate_2048_benchmark_from_logs` with distinct whole-log vs segment fields, updated markdown formatter)
+- `zenith/aggregator.py` (added `record_scope` and source log tracking to `SUMMARY_FIELDNAMES` and `parse_jsonl_session`, updated `generate_benchmark_report_md` to display both segment and whole-log metrics)
+- `tests/test_benchmark.py` (added `test_split_records_into_segments` and `test_multi_segment_benchmark_log_disentanglement`)
+- `tests/test_aggregator.py` (added `test_parse_multi_segment_jsonl_session` and `test_aggregate_multi_segment_session`)
+- `logs/benchmarks/benchmark_2048_v3.json` & `benchmark_2048_v3_holdout.json` (regenerated with evaluated segment metrics and source log tracking)
+- `logs/benchmarks/run_history.jsonl`, `run_history.csv`, `benchmark_report.md` (re-aggregated with explicit scope and segment/total columns)
+- `PROJECT_STATE.md` & `IMPLEMENTATION_PLAN.md` (updated with segment audit results and verification status)
 
-## 2048 Benchmark Comparison: Baseline (v1) vs Revised (v2) vs Strategic (v3)
+## Final Per-Seed 2048 v3 Benchmark Segment Integrity Table
 
-### Standard 5-Seed Set (Reconciled from Source Records)
+| Seed | Scope | Total Log Recs | Total Log Applied | Total Log Rejected | Seg Index / Count | Seg Applied (Steps) | Seg Rejections | Seg Best Tile | Seg Score | Won | Seg Termination Reason | Hash Chain Valid |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **7** | Segment | 400 | 391 | 9 | 2 / 2 | **312** | **0** | **512** | **4,588** | NO | `no_moves_remaining` | **PASS** |
+| **13** | Segment | 265 | 247 | 18 | 2 / 2 | **152** | **9** | **256** | **1,960** | NO | `no_moves_remaining` | **PASS** |
+| **42** | Segment | 418 | 409 | 9 | 2 / 2 | **281** | **0** | **256** | **3,320** | NO | `no_moves_remaining` | **PASS** |
+| **100** | Segment | 171 | 162 | 9 | 3 / 3 | **80** | **0** | **64** | **600** | NO | `no_moves_remaining` | **PASS** |
+| **2026** | Segment | 263 | 254 | 9 | 2 / 2 | **235** | **0** | **256** | **2,844** | NO | `no_moves_remaining` | **PASS** |
+| **99** *(Holdout)* | Single | 413 | 413 | 0 | 1 / 1 | **413** | **0** | **512** | **5,812** | NO | `no_moves_remaining` | **PASS** |
+| **123** *(Holdout)* | Single | 164 | 164 | 0 | 1 / 1 | **164** | **0** | **128** | **1,536** | NO | `no_moves_remaining` | **PASS** |
+| **777** *(Holdout)* | Single | 241 | 241 | 0 | 1 / 1 | **241** | **0** | **256** | **2,792** | NO | `no_moves_remaining` | **PASS** |
 
-| Seed | v1 Best | v2 Best | v3 Best Tile | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves (Total / Seg2) | v3 Rej (Total / Seg2) | v3 Reason |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 7 | 8 | 128 | **512** | 12 | 1,716 | **4,588** | 3 | 170 | **391** (312) | **9** (0) | `no_moves_remaining` |
-| 13 | 8 | 64 | **256** | 16 | 616 | **1,960** | 6 | 85 | **247** (152) | **18** (9) | `no_moves_remaining` |
-| 42 | 8 | 128 | **256** | 20 | 1,316 | **3,320** | 6 | 136 | **409** (281) | **9** (0) | `no_moves_remaining` |
-| 100 | 8 | 128 | **64** | 16 | 1,392 | **600** | 4 | 145 | **162** (80) | **9** (0) | `no_moves_remaining` |
-| 2026 | 4 | 256 | **256** | 12 | 3,472 | **2,844** | 7 | 292 | **254** (235) | **9** (0) | `no_moves_remaining` |
+
 
 - **v1 Baseline:** Max Tile = 8, Avg Tile = 7.2, Avg Score = 15.2, 0% completion (momentum loop).
 - **v2 Baseline:** Max Tile = 256, Avg Tile = 140.8, Avg Score = 1,702.4, 20% reaching >= 256, 0% reaching 512.
@@ -125,3 +124,4 @@ Task M6C conducted a forensic audit across all raw v3 JSONL logs, final response
 - **2026-10-17 | Task M6 2048 Adapter, Local Simulator & Benchmark Completed:** Built `Deterministic2048Simulator` and extended `LayaAdapter` for 2048. Verified official contract (4x4, powers of 2, single-merge, 90/10 spawn, no-op rejection). Benchmarked approved local Laya model across 5 seeds: v2 achieved max tile 256, avg tile 140.8, avg score 1,702.4 with 0 rejections (112x score increase over v1). Re-aggregated 23 total runs with 100% valid SHA-256 hash chains. Added 31 unit tests (228 total tests passing). Zero live Arena calls made.
 - **2026-10-17 | Task M6B 2048 Strategic Prompt Optimization (v3) Completed:** Analyzed v2 decision traces (center-cell congestion trap). Implemented v3 prompt with corner-anchor preservation, spatial positioning helper `_describe_2048_tile_position`, verifiable immediate consequence criteria. Evaluated standard 5 seeds: Seed 7 reached tile **512** (4,588 pts), 80% reached >= 256, avg tile 268.8 (+90.9% over v2). Evaluated 3 holdout seeds: Seed 99 reached tile **512** (5,812 pts, 413 moves, 0 rejections). Added 4 unit tests (232 total tests passing [PASS]). Re-aggregated 31 runs with 100% valid SHA-256 hash chains [PASS]. Zero live Arena calls made.
 - **2026-10-17 | Task M6C 2048 v3 Benchmark Integrity Audit Completed:** Audited raw v3 logs against final payloads, benchmark summaries, and aggregator tables. Reconciled seed 13 discrepancy (raw log has 18 total rejections, 9 in segment 2; removed prior hardcoded assignment of 10). Built `generate_2048_benchmark_from_logs` in `zenith/benchmark.py` and updated `zenith/aggregator.py` to derive counts directly from source JSONL records. Added unit test in `tests/test_benchmark.py` (233 total tests passing [PASS]). Regenerated `benchmark_2048_v3.json` and consolidated reports with 100% mutual consistency and valid hash chains.
+- **2026-10-17 | Task M6D Final Benchmark Segment Integrity Check Completed:** Validated that consolidated benchmark history distinguishes complete source logs from evaluated game segments. Added `split_records_into_segments`, `record_scope`, and source vs segment metrics across `zenith/benchmark.py` and `zenith/aggregator.py`. Reconciled `benchmark_2048_v3.json` with evaluated segment metrics (Seed 42: 281 moves, Seed 100: 80 moves, Seed 2026: 235 moves, Seed 7: 312 moves, Seed 13: 152 moves). Added 4 regression tests (237 total tests passing [PASS]). Re-aggregated run history; verified 31/31 SHA-256 hash chains valid [PASS]. Verified ready for M7 live session.
