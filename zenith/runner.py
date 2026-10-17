@@ -151,6 +151,21 @@ class SessionRunner:
         on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
         on_complete: Optional[Callable[[SessionResult], None]] = None,
     ):
+        """Initialize the session runner.
+
+        Args:
+            arena: Arena API adapter (or mock).
+            decide_fn: Callable that produces decisions from game state.
+            logger: SessionLogger for JSONL output.
+            viewer: DecisionViewer for terminal display.
+            fallback_tracker: FallbackTracker instance (created if None).
+            max_consecutive_errors: Stop after this many consecutive errors.
+            max_consecutive_rejections: Stop after this many consecutive rejected moves.
+            max_consecutive_no_progress: Stop after this many consecutive no-progress transitions.
+            max_moves: Optional maximum applied moves before stopping session safely.
+            on_step: Optional callback invoked on each step.
+            on_complete: Optional callback invoked when session completes.
+        """
         self._arena = arena
         self._decide_fn = decide_fn
         self._logger = logger
@@ -167,6 +182,7 @@ class SessionRunner:
     def stop(self) -> None:
         """Signal the session runner loop to stop gracefully after current step."""
         self._stop_requested = True
+
 
     def run(self, initial_session_data: Optional[Dict[str, Any]] = None) -> SessionResult:
         """Run the full session loop until the game concludes or stops."""
@@ -250,6 +266,8 @@ class SessionRunner:
             try:
                 response = self._arena.submit_action(session_id, action)
             except Exception as exc:
+                # Do NOT automatically retry an action after a timeout or interrupted HTTP request.
+                # The server may already have processed the request.
                 result.error = (
                     f"API error during submit_action (action '{action}'): {exc}. "
                     "Session stopped to prevent duplicate action submission (consecutive API errors limit)."

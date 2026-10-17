@@ -1,6 +1,6 @@
 # Team ZENITH - Run History and Benchmark Report
 
-**Generated:** 2026-10-16 21:05:02 UTC  
+**Generated:** 2026-10-17 03:15:29 UTC  
 **Team / Agent Name:** `ZENITH`  
 **Total Discovered Runs:** 31 (`1` live arena, `28` local simulator, `2` mock)
 
@@ -40,39 +40,39 @@
 
 ## 2. Consolidated Run History
 
-| Session ID | Run Type | Prompt | Seed | Score | Steps | Food | Won | Applied | Rejected | Fallback | Avg Latency | Hash Valid |
+| Session ID | Run Type | Scope | Prompt | Seed | Score | Steps (Seg) | Food | Won | Seg Moves (App/Rej) | Total Log (App/Rej) | Avg Latency | Hash Valid |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `f240cb86-0d3d-4445-97...` | `live_arena` | v2 | - | 1000 | 152 | 15 | YES | 152 | 0 | 0 | 99.49 ms | **PASS** |
-| `bench-v1-100` | `local_simulator` | v1 | 100 | 0 | 7 | 0 | NO | 7 | 0 | 0 | 41.14 ms | **PASS** |
-| `bench-v1-2026` | `local_simulator` | v1 | 2026 | 60 | 7 | 1 | NO | 7 | 0 | 0 | 42.0 ms | **PASS** |
-| `bench-v1-42` | `local_simulator` | v1 | 42 | 0 | 7 | 0 | NO | 7 | 0 | 0 | 81.29 ms | **PASS** |
-| `bench-v1-13` | `local_simulator` | v1 | 13 | 60 | 7 | 1 | NO | 7 | 0 | 0 | 42.43 ms | **PASS** |
-| `bench-v1-7` | `local_simulator` | v1 | 7 | 0 | 7 | 0 | NO | 7 | 0 | 0 | 41.86 ms | **PASS** |
-| `bench-v2-42` | `local_simulator` | v2 | 42 | 1000 | 114 | 15 | YES | 114 | 3340 | 0 | 43.24 ms | **PASS** |
-| `bench-v2-100` | `local_simulator` | v2 | 100 | 1000 | 151 | 15 | YES | 151 | 0 | 0 | 49.15 ms | **PASS** |
-| `bench-v2-2026` | `local_simulator` | v2 | 2026 | 1000 | 113 | 15 | YES | 113 | 0 | 0 | 49.22 ms | **PASS** |
-| `bench-v2-7` | `local_simulator` | v2 | 7 | 660 | 114 | 11 | NO | 114 | 0 | 0 | 49.65 ms | **PASS** |
-| `bench-v2-13` | `local_simulator` | v2 | 13 | 660 | 64 | 11 | NO | 64 | 0 | 0 | 48.33 ms | **PASS** |
-| `bench-2048-v2-42` | `local_simulator` | v2 | 42 | 1316 | 272 | - | NO | 272 | 0 | 0 | 61.13 ms | **PASS** |
-| `bench-2048-v1-42` | `local_simulator` | v1 | 42 | 20 | 6 | - | NO | 6 | 9 | 0 | 107.4 ms | **PASS** |
-| `bench-2048-v1-100` | `local_simulator` | v1 | 100 | 16 | 4 | - | NO | 4 | 9 | 0 | 77.77 ms | **PASS** |
-| `bench-2048-v1-2026` | `local_simulator` | v1 | 2026 | 12 | 7 | - | NO | 7 | 9 | 0 | 65.88 ms | **PASS** |
-| `bench-2048-v1-7` | `local_simulator` | v1 | 7 | 12 | 3 | - | NO | 3 | 9 | 0 | 53.58 ms | **PASS** |
-| `bench-2048-v1-13` | `local_simulator` | v1 | 13 | 16 | 6 | - | NO | 6 | 9 | 0 | 65.2 ms | **PASS** |
-| `bench-2048-v2-100` | `local_simulator` | v2 | 100 | 1392 | 145 | - | NO | 145 | 0 | 0 | 59.8 ms | **PASS** |
-| `bench-2048-v2-2026` | `local_simulator` | v2 | 2026 | 3472 | 292 | - | NO | 292 | 0 | 0 | 59.39 ms | **PASS** |
-| `bench-2048-v2-7` | `local_simulator` | v2 | 7 | 1716 | 170 | - | NO | 170 | 0 | 0 | 61.01 ms | **PASS** |
-| `bench-2048-v2-13` | `local_simulator` | v2 | 13 | 616 | 85 | - | NO | 85 | 0 | 0 | 58.53 ms | **PASS** |
-| `bench-2048-v3-42` | `local_simulator` | v3 | 42 | 3320 | 409 | - | NO | 409 | 9 | 0 | 54.67 ms | **PASS** |
-| `bench-2048-v3-100` | `local_simulator` | v3 | 100 | 600 | 162 | - | NO | 162 | 9 | 0 | 55.82 ms | **PASS** |
-| `bench-2048-v3-2026` | `local_simulator` | v3 | 2026 | 2844 | 254 | - | NO | 254 | 9 | 0 | 51.17 ms | **PASS** |
-| `bench-2048-v3-7` | `local_simulator` | v3 | 7 | 4588 | 391 | - | NO | 391 | 9 | 0 | 51.57 ms | **PASS** |
-| `bench-2048-v3-13` | `local_simulator` | v3 | 13 | 1960 | 247 | - | NO | 247 | 18 | 0 | 50.74 ms | **PASS** |
-| `bench-2048-v3-99` | `local_simulator` | v3 | 99 | 5812 | 413 | - | NO | 413 | 0 | 0 | 52.51 ms | **PASS** |
-| `bench-2048-v3-123` | `local_simulator` | v3 | 123 | 1536 | 164 | - | NO | 164 | 0 | 0 | 50.14 ms | **PASS** |
-| `bench-2048-v3-777` | `local_simulator` | v3 | 777 | 2792 | 241 | - | NO | 241 | 0 | 0 | 50.02 ms | **PASS** |
-| `mock-snake-1792177345472` | `mock` | - | - | 100 | 3 | 1 | YES | 3 | 0 | 0 | 0.0 ms | **PASS** |
-| `mock-2048-42` | `mock` | v1 | - | 4 | 2 | - | NO | 2 | 9 | 0 | 0.0 ms | **PASS** |
+| `f240cb86-0d3d-4445-97...` | `live_arena` | Single | v2 | - | 1000 | 152 | 15 | YES | 152/0 | 152/0 | 99.49 ms | **PASS** |
+| `bench-v1-100` | `local_simulator` | Single | v1 | 100 | 0 | 7 | 0 | NO | 7/0 | 7/0 | 41.14 ms | **PASS** |
+| `bench-v1-2026` | `local_simulator` | Single | v1 | 2026 | 60 | 7 | 1 | NO | 7/0 | 7/0 | 42.0 ms | **PASS** |
+| `bench-v1-42` | `local_simulator` | Single | v1 | 42 | 0 | 7 | 0 | NO | 7/0 | 7/0 | 81.29 ms | **PASS** |
+| `bench-v1-13` | `local_simulator` | Single | v1 | 13 | 60 | 7 | 1 | NO | 7/0 | 7/0 | 42.43 ms | **PASS** |
+| `bench-v1-7` | `local_simulator` | Single | v1 | 7 | 0 | 7 | 0 | NO | 7/0 | 7/0 | 41.86 ms | **PASS** |
+| `bench-v2-42` | `local_simulator` | Segment | v2 | 42 | 1000 | 105 | 15 | YES | 105/0 | 114/3340 | 54.37 ms | **PASS** |
+| `bench-v2-100` | `local_simulator` | Single | v2 | 100 | 1000 | 151 | 15 | YES | 151/0 | 151/0 | 49.15 ms | **PASS** |
+| `bench-v2-2026` | `local_simulator` | Single | v2 | 2026 | 1000 | 113 | 15 | YES | 113/0 | 113/0 | 49.22 ms | **PASS** |
+| `bench-v2-7` | `local_simulator` | Single | v2 | 7 | 660 | 114 | 11 | NO | 114/0 | 114/0 | 49.65 ms | **PASS** |
+| `bench-v2-13` | `local_simulator` | Single | v2 | 13 | 660 | 64 | 11 | NO | 64/0 | 64/0 | 48.33 ms | **PASS** |
+| `bench-2048-v1-42` | `local_simulator` | Single | v1 | 42 | 20 | 6 | - | NO | 6/9 | 6/9 | 107.4 ms | **PASS** |
+| `bench-2048-v1-100` | `local_simulator` | Single | v1 | 100 | 16 | 4 | - | NO | 4/9 | 4/9 | 77.77 ms | **PASS** |
+| `bench-2048-v1-2026` | `local_simulator` | Single | v1 | 2026 | 12 | 7 | - | NO | 7/9 | 7/9 | 65.88 ms | **PASS** |
+| `bench-2048-v1-7` | `local_simulator` | Single | v1 | 7 | 12 | 3 | - | NO | 3/9 | 3/9 | 53.58 ms | **PASS** |
+| `bench-2048-v1-13` | `local_simulator` | Single | v1 | 13 | 16 | 6 | - | NO | 6/9 | 6/9 | 65.2 ms | **PASS** |
+| `bench-2048-v2-42` | `local_simulator` | Segment | v2 | 42 | 1316 | 136 | - | NO | 136/0 | 272/0 | 61.1 ms | **PASS** |
+| `bench-2048-v2-100` | `local_simulator` | Single | v2 | 100 | 1392 | 145 | - | NO | 145/0 | 145/0 | 59.8 ms | **PASS** |
+| `bench-2048-v2-2026` | `local_simulator` | Single | v2 | 2026 | 3472 | 292 | - | NO | 292/0 | 292/0 | 59.39 ms | **PASS** |
+| `bench-2048-v2-7` | `local_simulator` | Single | v2 | 7 | 1716 | 170 | - | NO | 170/0 | 170/0 | 61.01 ms | **PASS** |
+| `bench-2048-v2-13` | `local_simulator` | Single | v2 | 13 | 616 | 85 | - | NO | 85/0 | 85/0 | 58.53 ms | **PASS** |
+| `bench-2048-v3-42` | `local_simulator` | Segment | v3 | 42 | 3320 | 281 | - | NO | 281/0 | 409/9 | 53.48 ms | **PASS** |
+| `bench-2048-v3-2026` | `local_simulator` | Segment | v3 | 2026 | 2844 | 235 | - | NO | 235/0 | 254/9 | 51.13 ms | **PASS** |
+| `bench-2048-v3-7` | `local_simulator` | Segment | v3 | 7 | 4588 | 312 | - | NO | 312/0 | 391/9 | 51.75 ms | **PASS** |
+| `bench-2048-v3-13` | `local_simulator` | Segment | v3 | 13 | 1960 | 152 | - | NO | 152/9 | 247/18 | 50.99 ms | **PASS** |
+| `bench-2048-v3-99` | `local_simulator` | Single | v3 | 99 | 5812 | 413 | - | NO | 413/0 | 413/0 | 52.51 ms | **PASS** |
+| `bench-2048-v3-123` | `local_simulator` | Single | v3 | 123 | 1536 | 164 | - | NO | 164/0 | 164/0 | 50.14 ms | **PASS** |
+| `bench-2048-v3-777` | `local_simulator` | Single | v3 | 777 | 2792 | 241 | - | NO | 241/0 | 241/0 | 50.02 ms | **PASS** |
+| `bench-2048-v3-100` | `local_simulator` | Segment | v3 | 100 | 600 | 80 | - | NO | 80/0 | 162/9 | 62.25 ms | **PASS** |
+| `mock-snake-1792177345472` | `mock` | Single | - | - | 100 | 3 | 1 | YES | 3/0 | 3/0 | 0.0 ms | **PASS** |
+| `mock-2048-42` | `mock` | Single | v1 | - | 4 | 2 | - | NO | 2/9 | 2/9 | 0.0 ms | **PASS** |
 
 ---
 
@@ -88,7 +88,7 @@
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 7 | 0 | **660** | 0 | **11** | 7 | 114 | NO | **NO** | `wall_collision` | `self_collision` |
 | 13 | 60 | **660** | 1 | **11** | 7 | 64 | NO | **NO** | `wall_collision` | `self_collision` |
-| 42 | 0 | **1000** | 0 | **15** | 7 | 114 | NO | **YES** | `wall_collision` | `target_food_reached` |
+| 42 | 0 | **1000** | 0 | **15** | 7 | 105 | NO | **YES** | `wall_collision` | `target_food_reached` |
 | 100 | 0 | **1000** | 0 | **15** | 7 | 151 | NO | **YES** | `wall_collision` | `target_food_reached` |
 | 2026 | 60 | **1000** | 1 | **15** | 7 | 113 | NO | **YES** | `wall_collision` | `target_food_reached` |
 
@@ -104,27 +104,27 @@
 > **2048 Simulator Equivalence & Qualification Scope:**
 > `Deterministic2048Simulator` implements the official TopGameAI 4x4 mechanics, single-merge-per-move rules, 90/10 tile spawning, and no-op move rejection. Local simulation results are reproducible benchmark baselines and do NOT substitute for an official Arena qualifying run.
 
-| Seed | Prompt | Best Tile | Merge Score | Steps | Rejections | Won | Reason | Avg Latency | Chain Valid |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 42 | v2 | **128** | 1316 | 272 | 0 | NO | `no_moves_remaining` | 61.13 ms | **PASS** |
-| 42 | v1 | **8** | 20 | 6 | 9 | NO | `unknown` | 107.4 ms | **PASS** |
-| 100 | v1 | **8** | 16 | 4 | 9 | NO | `unknown` | 77.77 ms | **PASS** |
-| 2026 | v1 | **4** | 12 | 7 | 9 | NO | `unknown` | 65.88 ms | **PASS** |
-| 7 | v1 | **8** | 12 | 3 | 9 | NO | `unknown` | 53.58 ms | **PASS** |
-| 13 | v1 | **8** | 16 | 6 | 9 | NO | `unknown` | 65.2 ms | **PASS** |
-| 100 | v2 | **128** | 1392 | 145 | 0 | NO | `no_moves_remaining` | 59.8 ms | **PASS** |
-| 2026 | v2 | **256** | 3472 | 292 | 0 | NO | `no_moves_remaining` | 59.39 ms | **PASS** |
-| 7 | v2 | **128** | 1716 | 170 | 0 | NO | `no_moves_remaining` | 61.01 ms | **PASS** |
-| 13 | v2 | **64** | 616 | 85 | 0 | NO | `no_moves_remaining` | 58.53 ms | **PASS** |
-| 42 | v3 | **256** | 3320 | 409 | 9 | NO | `no_moves_remaining` | 54.67 ms | **PASS** |
-| 100 | v3 | **64** | 600 | 162 | 9 | NO | `no_moves_remaining` | 55.82 ms | **PASS** |
-| 2026 | v3 | **256** | 2844 | 254 | 9 | NO | `no_moves_remaining` | 51.17 ms | **PASS** |
-| 7 | v3 | **512** | 4588 | 391 | 9 | NO | `no_moves_remaining` | 51.57 ms | **PASS** |
-| 13 | v3 | **256** | 1960 | 247 | 18 | NO | `no_moves_remaining` | 50.74 ms | **PASS** |
-| 99 | v3 | **512** | 5812 | 413 | 0 | NO | `no_moves_remaining` | 52.51 ms | **PASS** |
-| 123 | v3 | **128** | 1536 | 164 | 0 | NO | `no_moves_remaining` | 50.14 ms | **PASS** |
-| 777 | v3 | **256** | 2792 | 241 | 0 | NO | `no_moves_remaining` | 50.02 ms | **PASS** |
-| - | v1 | **4** | 4 | 2 | 9 | NO | `-` | 0.0 ms | **PASS** |
+| Seed | Prompt | Best Tile | Merge Score | Steps (Seg) | Rejections (Seg) | Total Log (App/Rej) | Scope | Won | Reason | Avg Latency | Chain Valid |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 42 | v1 | **8** | 20 | 6 | 9 | 6/9 | Single | NO | `unknown` | 107.4 ms | **PASS** |
+| 100 | v1 | **8** | 16 | 4 | 9 | 4/9 | Single | NO | `unknown` | 77.77 ms | **PASS** |
+| 2026 | v1 | **4** | 12 | 7 | 9 | 7/9 | Single | NO | `unknown` | 65.88 ms | **PASS** |
+| 7 | v1 | **8** | 12 | 3 | 9 | 3/9 | Single | NO | `unknown` | 53.58 ms | **PASS** |
+| 13 | v1 | **8** | 16 | 6 | 9 | 6/9 | Single | NO | `unknown` | 65.2 ms | **PASS** |
+| 42 | v2 | **128** | 1316 | 136 | 0 | 272/0 | Segment | NO | `no_moves_remaining` | 61.1 ms | **PASS** |
+| 100 | v2 | **128** | 1392 | 145 | 0 | 145/0 | Single | NO | `no_moves_remaining` | 59.8 ms | **PASS** |
+| 2026 | v2 | **256** | 3472 | 292 | 0 | 292/0 | Single | NO | `no_moves_remaining` | 59.39 ms | **PASS** |
+| 7 | v2 | **128** | 1716 | 170 | 0 | 170/0 | Single | NO | `no_moves_remaining` | 61.01 ms | **PASS** |
+| 13 | v2 | **64** | 616 | 85 | 0 | 85/0 | Single | NO | `no_moves_remaining` | 58.53 ms | **PASS** |
+| 42 | v3 | **256** | 3320 | 281 | 0 | 409/9 | Segment | NO | `no_moves_remaining` | 53.48 ms | **PASS** |
+| 2026 | v3 | **256** | 2844 | 235 | 0 | 254/9 | Segment | NO | `no_moves_remaining` | 51.13 ms | **PASS** |
+| 7 | v3 | **512** | 4588 | 312 | 0 | 391/9 | Segment | NO | `no_moves_remaining` | 51.75 ms | **PASS** |
+| 13 | v3 | **256** | 1960 | 152 | 9 | 247/18 | Segment | NO | `no_moves_remaining` | 50.99 ms | **PASS** |
+| 99 | v3 | **512** | 5812 | 413 | 0 | 413/0 | Single | NO | `no_moves_remaining` | 52.51 ms | **PASS** |
+| 123 | v3 | **128** | 1536 | 164 | 0 | 164/0 | Single | NO | `no_moves_remaining` | 50.14 ms | **PASS** |
+| 777 | v3 | **256** | 2792 | 241 | 0 | 241/0 | Single | NO | `no_moves_remaining` | 50.02 ms | **PASS** |
+| 100 | v3 | **64** | 600 | 80 | 0 | 162/9 | Segment | NO | `no_moves_remaining` | 62.25 ms | **PASS** |
+| - | v1 | **4** | 4 | 2 | 9 | 2/9 | Single | NO | `-` | 0.0 ms | **PASS** |
 
 - **Max Tile Reached:** **512**
 - **Average Highest Tile:** **157.1**
@@ -132,16 +132,16 @@
 
 ### 2048 Prompt Comparison (v1 vs v2 vs v3)
 
-| Seed | v1 Best | v2 Best | v3 Best | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves | v3 Rej | v3 Reason |
+| Seed | v1 Best | v2 Best | v3 Best | v1 Score | v2 Score | v3 Score | v1 Moves | v2 Moves | v3 Moves (Seg / Total) | v3 Rej (Seg / Total) | v3 Reason |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 7 | 8 | 128 | **512** | 12 | 1716 | **4588** | 3 | 170 | 391 | 9 | `no_moves_remaining` |
-| 13 | 8 | 64 | **256** | 16 | 616 | **1960** | 6 | 85 | 247 | 18 | `no_moves_remaining` |
-| 42 | 8 | 128 | **256** | 20 | 1316 | **3320** | 6 | 272 | 409 | 9 | `no_moves_remaining` |
-| 99 | - | - | **512** | - | - | **5812** | - | - | 413 | 0 | `no_moves_remaining` |
-| 100 | 8 | 128 | **64** | 16 | 1392 | **600** | 4 | 145 | 162 | 9 | `no_moves_remaining` |
-| 123 | - | - | **128** | - | - | **1536** | - | - | 164 | 0 | `no_moves_remaining` |
-| 777 | - | - | **256** | - | - | **2792** | - | - | 241 | 0 | `no_moves_remaining` |
-| 2026 | 4 | 256 | **256** | 12 | 3472 | **2844** | 7 | 292 | 254 | 9 | `no_moves_remaining` |
+| 7 | 8 | 128 | **512** | 12 | 1716 | **4588** | 3 | 170 | **312** (391) | **0** (9) | `no_moves_remaining` |
+| 13 | 8 | 64 | **256** | 16 | 616 | **1960** | 6 | 85 | **152** (247) | **9** (18) | `no_moves_remaining` |
+| 42 | 8 | 128 | **256** | 20 | 1316 | **3320** | 6 | 136 | **281** (409) | **0** (9) | `no_moves_remaining` |
+| 99 | - | - | **512** | - | - | **5812** | - | - | **413** (413) | **0** (0) | `no_moves_remaining` |
+| 100 | 8 | 128 | **64** | 16 | 1392 | **600** | 4 | 145 | **80** (162) | **0** (9) | `no_moves_remaining` |
+| 123 | - | - | **128** | - | - | **1536** | - | - | **164** (164) | **0** (0) | `no_moves_remaining` |
+| 777 | - | - | **256** | - | - | **2792** | - | - | **241** (241) | **0** (0) | `no_moves_remaining` |
+| 2026 | 4 | 256 | **256** | 12 | 3472 | **2844** | 7 | 292 | **235** (254) | **0** (9) | `no_moves_remaining` |
 
 ---
 

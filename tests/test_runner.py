@@ -16,7 +16,13 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from zenith.decision_validator import FallbackTracker
 from zenith.decision_viewer import DecisionViewer
-from zenith.runner import SessionRunner, SessionResult, _extract_state
+from zenith.runner import (
+    SessionRunner,
+    SessionResult,
+    _extract_state,
+    check_state_progress,
+    normalize_2048_grid,
+)
 from zenith.session_logger import SessionLogger
 
 
@@ -365,6 +371,439 @@ class TestSessionRunnerWonGame(unittest.TestCase):
         self.assertTrue(result.won)
         self.assertEqual(result.final_score, 1000)
         self.assertTrue(result.hash_chain_valid)
+
+
+class Mock2048ScriptArena:
+    """Deterministic mock arena for 2048 tests that records actions."""
+
+    def __init__(
+        self,
+        session_id: str,
+        script: List[Dict[str, Any]],
+        initial_state: Optional[Dict[str, Any]] = None,
+    ):
+        self._session_id = session_id
+        self._script = list(script)
+        self._index = 0
+        self.actions_received: List[str] = []
+        self._initial_state = initial_state or {
+            "session_id": session_id,
+            "game": "2048",
+            "state": {
+                "grid": [
+                    [0, 0, 2, 0],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                ],
+                "score": 0,
+                "best": 2,
+            },
+            "done": False,
+            "score": 0,
+        }
+
+    def create_session(self, game: str, agent_name: str) -> Dict[str, Any]:
+        return dict(self._initial_state)
+
+    def get_session(self, session_id: str) -> Dict[str, Any]:
+        return dict(self._initial_state)
+
+    def submit_action(self, session_id: str, action: str) -> Dict[str, Any]:
+        self.actions_received.append(action)
+        if self._index >= len(self._script):
+            return {
+                "session_id": session_id,
+                "done": True,
+                "score": 0,
+                "result": "applied",
+            }
+        resp = dict(self._script[self._index])
+        self._index += 1
+        resp.setdefault("session_id", session_id)
+        return resp
+
+
+class TestSessionRunnerNoProgressGuard(unittest.TestCase):
+    """M7 Hotfix tests: Guard against 2048 no-progress loops, duplicate retries, and malformed states."""
+
+    def setUp(self):
+        self._tmp_dir = tempfile.mkdtemp()
+
+    def _make_2048_runner(
+        self,
+        script: List[Dict[str, Any]],
+        initial_state: Optional[Dict[str, Any]] = None,
+        decide_fn=None,
+        session_id: str = "test-2048-np-001",
+        max_consecutive_no_progress: int = 1,
+    ):
+        arena = Mock2048ScriptArena(session_id, script, initial_state=initial_state)
+        buf = io.StringIO()
+        logger = SessionLogger(session_id, "2048", log_dir=self._tmp_dir)
+        viewer = DecisionViewer("2048", session_id, mock_mode=True, log_path=str(logger.log_path), out=buf)
+        runner = SessionRunner(
+            arena=arena,
+            decide_fn=decide_fn or _laya_decision,
+            logger=logger,
+            viewer=viewer,
+            max_consecutive_no_progress=max_consecutive_no_progress,
+        )
+        return runner, arena, logger, buf
+
+    def test_applied_action_with_changed_board(self):
+        """1. An applied action with a changed board must be recorded as applied and continue."""
+        initial_state = {
+            "session_id": "test-np-1",
+            "game": "2048",
+            "state": {"grid": [[0, 0, 2, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], "score": 0, "best": 2},
+            "done": False,
+            "score": 0,
+        }
+        script = [
+            {
+                "state": {"grid": [[2, 0, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], "score": 0, "best": 2},
+                "done": True,
+                "score": 0,
+                "result": "applied",
+            }
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(script, initial_state=initial_state, session_id="test-np-1")
+        result = runner.run()
+
+        self.assertEqual(result.applied_moves, 1)
+        self.assertEqual(result.no_progress_moves, 0)
+        self.assertEqual(result.rejected_moves, 0)
+        self.assertEqual(result.moves[0].result, "applied")
+        self.assertIsNone(result.error)
+        self.assertTrue(result.hash_chain_valid)
+
+    def test_applied_action_with_unchanged_board(self):
+        """2. An applied action with an unchanged board must be detected as no_progress."""
+        frozen_grid = [
+            [8, 4, 32, 4],
+            [16, 128, 16, 16],
+            [2, 256, 4, 2],
+            [0, 0, 2, 8],
+        ]
+        initial_state = {
+            "session_id": "test-np-2",
+            "game": "2048",
+            "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+            "done": False,
+            "score": 2772,
+        }
+        # Server falsely returns result='applied' with unchanged grid and score
+        script = [
+            {
+                "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+                "done": False,
+                "score": 2772,
+                "result": "applied",
+            }
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(
+            script, initial_state=initial_state, session_id="test-np-2", max_consecutive_no_progress=1
+        )
+        result = runner.run()
+
+        self.assertEqual(result.applied_moves, 0)
+        self.assertEqual(result.no_progress_moves, 1)
+        self.assertEqual(result.moves[0].result, "no_progress")
+        self.assertIsNotNone(result.error)
+        self.assertIn("No-progress detected", result.error)
+        self.assertTrue(result.hash_chain_valid)
+
+        # Verify JSONL log on disk records result as 'no_progress'
+        with open(result.log_path, "r", encoding="utf-8") as f:
+            lines = [json.loads(line) for line in f]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["result"], "no_progress")
+        self.assertEqual(lines[0]["action"], "up")
+
+    def test_explicitly_rejected_action(self):
+        """3. An explicitly rejected action must be preserved and distinguished from applied/no-progress."""
+        grid_a = [[0, 0, 2, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        grid_b = [[2, 0, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        initial_state = {
+            "session_id": "test-np-3",
+            "game": "2048",
+            "state": {"grid": grid_a, "score": 0, "best": 2},
+            "done": False,
+            "score": 0,
+        }
+        script = [
+            {
+                "state": {"grid": grid_a, "score": 0, "best": 2},
+                "done": False,
+                "score": 0,
+                "result": "rejected",
+            },
+            {
+                "state": {"grid": grid_b, "score": 0, "best": 2},
+                "done": True,
+                "score": 0,
+                "result": "applied",
+            },
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(script, initial_state=initial_state, session_id="test-np-3")
+        result = runner.run()
+
+        self.assertEqual(result.rejected_moves, 1)
+        self.assertEqual(result.applied_moves, 1)
+        self.assertEqual(result.no_progress_moves, 0)
+        self.assertEqual(result.moves[0].result, "rejected")
+        self.assertEqual(result.moves[1].result, "applied")
+        self.assertIsNone(result.error)
+
+    def test_repeated_identical_board_stops_at_threshold(self):
+        """4. Repeated identical boards must stop submissions when threshold is reached."""
+        frozen_grid = [
+            [8, 4, 32, 4],
+            [16, 128, 16, 16],
+            [2, 256, 4, 2],
+            [0, 0, 2, 8],
+        ]
+        initial_state = {
+            "session_id": "test-np-4",
+            "game": "2048",
+            "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+            "done": False,
+            "score": 2772,
+        }
+        # Provide 5 identical responses; runner configured with threshold 2
+        script = [
+            {"state": {"grid": frozen_grid, "score": 2772, "best": 256}, "done": False, "score": 2772, "result": "applied"}
+            for _ in range(5)
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(
+            script, initial_state=initial_state, session_id="test-np-4", max_consecutive_no_progress=2
+        )
+        result = runner.run()
+
+        # Must have stopped after exactly 2 actions
+        self.assertEqual(len(arena.actions_received), 2)
+        self.assertEqual(result.no_progress_moves, 2)
+        self.assertEqual(result.applied_moves, 0)
+        self.assertIn("2 no-progress move(s)", result.error)
+        self.assertTrue(result.hash_chain_valid)
+
+    def test_missing_or_malformed_post_action_state(self):
+        """5. Missing or malformed post-action state must trigger safe termination."""
+        initial_state = {
+            "session_id": "test-np-5",
+            "game": "2048",
+            "state": {"grid": [[0, 0, 2, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], "score": 0, "best": 2},
+            "done": False,
+            "score": 0,
+        }
+        # Response with malformed 2x2 grid instead of 4x4
+        script = [
+            {
+                "state": {"grid": [[1, 2], [3, 4]], "score": 0},
+                "done": False,
+                "score": 0,
+                "result": "applied",
+            }
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(script, initial_state=initial_state, session_id="test-np-5")
+        result = runner.run()
+
+        self.assertEqual(result.no_progress_moves, 1)
+        self.assertEqual(result.applied_moves, 0)
+        self.assertIsNotNone(result.error)
+        self.assertIn("malformed 4x4 grid", result.error)
+
+    def test_terminal_response(self):
+        """6. A terminal response (done=True) must be treated as game completion, not an error."""
+        frozen_grid = [
+            [8, 4, 32, 4],
+            [16, 128, 16, 16],
+            [2, 256, 4, 2],
+            [0, 0, 2, 8],
+        ]
+        initial_state = {
+            "session_id": "test-np-6",
+            "game": "2048",
+            "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+            "done": False,
+            "score": 2772,
+        }
+        # Terminal response: board unchanged because game is over (loss)
+        script = [
+            {
+                "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+                "done": True,
+                "won": False,
+                "score": 2772,
+                "result": "applied",
+            }
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(script, initial_state=initial_state, session_id="test-np-6")
+        result = runner.run()
+
+        self.assertIsNone(result.error)
+        self.assertEqual(result.applied_moves, 1)
+        self.assertEqual(result.no_progress_moves, 0)
+        self.assertFalse(result.won)
+        self.assertTrue(result.hash_chain_valid)
+
+    def test_timeout_with_no_automatic_action_retry(self):
+        """7. A timeout during action submission must NOT be retried."""
+        class TimeoutArena:
+            def __init__(self):
+                self.calls = 0
+
+            def create_session(self, g, a):
+                return {}
+
+            def get_session(self, s):
+                return {
+                    "session_id": s,
+                    "game": "2048",
+                    "state": {"grid": [[0] * 4 for _ in range(4)], "score": 0},
+                    "done": False,
+                    "score": 0,
+                }
+
+            def submit_action(self, s, a):
+                self.calls += 1
+                raise TimeoutError("Arena HTTP connection timed out after 10.0s")
+
+        arena = TimeoutArena()
+        buf = io.StringIO()
+        logger = SessionLogger("test-np-7", "2048", log_dir=self._tmp_dir)
+        viewer = DecisionViewer("2048", "test-np-7", mock_mode=True, out=buf)
+        runner = SessionRunner(
+            arena=arena,
+            decide_fn=_laya_decision,
+            logger=logger,
+            viewer=viewer,
+            max_consecutive_errors=5,
+        )
+        result = runner.run()
+
+        # Critical assertion: called EXACTLY once. ZERO retries.
+        self.assertEqual(arena.calls, 1)
+        self.assertIsNotNone(result.error)
+        self.assertIn("API error during submit_action", result.error)
+        self.assertIn("prevent duplicate action submission", result.error)
+
+    def test_no_progress_guard_stops_without_inventing_or_substituting_action(self):
+        """8. When stopped by no-progress guard, no substitution or action invention occurs."""
+        decisions_made = []
+
+        def recorded_decide(game, state):
+            decisions_made.append("up")
+            return {
+                "questions": ["Next 2048 move?"],
+                "probabilities": {"up": 0.40, "down": 0.20, "left": 0.20, "right": 0.20},
+                "chosen": "up",
+                "confidence": 0.40,
+                "source": "laya",
+            }
+
+        frozen_grid = [
+            [8, 4, 32, 4],
+            [16, 128, 16, 16],
+            [2, 256, 4, 2],
+            [0, 0, 2, 8],
+        ]
+        initial_state = {
+            "session_id": "test-np-8",
+            "game": "2048",
+            "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+            "done": False,
+            "score": 2772,
+        }
+        script = [
+            {
+                "state": {"grid": frozen_grid, "score": 2772, "best": 256},
+                "done": False,
+                "score": 2772,
+                "result": "applied",
+            }
+        ]
+        runner, arena, logger, buf = self._make_2048_runner(
+            script,
+            initial_state=initial_state,
+            decide_fn=recorded_decide,
+            session_id="test-np-8",
+            max_consecutive_no_progress=1,
+        )
+        result = runner.run()
+
+        # Exactly 1 decision requested from Laya
+        self.assertEqual(decisions_made, ["up"])
+        # Exactly 1 action submitted to arena
+        self.assertEqual(arena.actions_received, ["up"])
+        # No fallback moves substituted
+        self.assertEqual(result.fallback_moves, 0)
+        self.assertEqual(result.moves[0].decision["source"], "laya")
+        self.assertEqual(result.moves[0].action, "up")
+        self.assertIn("No-progress detected", result.error)
+
+
+class TestStateProgressHelpers(unittest.TestCase):
+    """Direct unit tests for normalize_2048_grid and check_state_progress."""
+
+    def test_normalize_valid_grid(self):
+        valid = [[2, 0, 0, 0], [0, 4, 0, 0], [0, 0, 8, 0], [0, 0, 0, 16]]
+        self.assertEqual(normalize_2048_grid(valid), valid)
+
+    def test_normalize_invalid_structures(self):
+        self.assertIsNone(normalize_2048_grid(None))
+        self.assertIsNone(normalize_2048_grid("not a grid"))
+        self.assertIsNone(normalize_2048_grid([[1, 2], [3, 4]]))  # 2x2
+        self.assertIsNone(normalize_2048_grid([[1, 2, 3, 4]] * 3))  # 3 rows
+        self.assertIsNone(normalize_2048_grid([[1, 2, 3, 4]] * 5))  # 5 rows
+        # Row with 3 elements
+        self.assertIsNone(normalize_2048_grid([[1, 2, 3], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
+        # Non-numeric elements (string, None, bool)
+        self.assertIsNone(normalize_2048_grid([[1, "2", 3, 4]] + [[0]*4]*3))
+        self.assertIsNone(normalize_2048_grid([[1, None, 3, 4]] + [[0]*4]*3))
+        self.assertIsNone(normalize_2048_grid([[True, 2, 3, 4]] + [[0]*4]*3))
+
+    def test_check_2048_progress_detection(self):
+        g1 = [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        g2 = [[0, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+
+        # Grid changed -> progress True
+        ok, reason = check_state_progress("2048", {"grid": g1, "score": 0}, {"grid": g2, "score": 0})
+        self.assertTrue(ok)
+        self.assertEqual(reason, "progress confirmed")
+
+        # Grid identical, score identical -> progress False
+        ok, reason = check_state_progress("2048", {"grid": g1, "score": 0}, {"grid": g1, "score": 0})
+        self.assertFalse(ok)
+        self.assertEqual(reason, "grid and score unchanged")
+
+        # Grid identical, but score changed -> progress True
+        ok, reason = check_state_progress("2048", {"grid": g1, "score": 0}, {"grid": g1, "score": 4})
+        self.assertTrue(ok)
+
+        # Malformed state_after
+        ok, reason = check_state_progress("2048", {"grid": g1}, "not a dict")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "state_after is not a dictionary")
+
+        # Missing grid
+        ok, reason = check_state_progress("2048", {"grid": g1}, {"score": 10})
+        self.assertFalse(ok)
+        self.assertIn("missing or malformed 4x4 grid", reason)
+
+    def test_check_snake_progress_detection(self):
+        s1 = {"snake": [[5, 5], [5, 6]], "score": 0, "foodEaten": 0}
+        s2 = {"snake": [[5, 4], [5, 5]], "score": 0, "foodEaten": 0}
+
+        # Snake moved -> progress True
+        ok, reason = check_state_progress("snake", s1, s2)
+        self.assertTrue(ok)
+
+        # Snake stationary and score unchanged -> progress False
+        ok, reason = check_state_progress("snake", s1, s1)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "snake coordinates and score unchanged")
 
 
 if __name__ == "__main__":
